@@ -10,6 +10,9 @@ from .ai_infra_agent import AIInfraAgent
 from .infrastructure_agent import InfrastructureAgent
 from .defense_agent import DefenseAgent
 from .news_agent import NewsAgent
+from .protest_agent import ProtestAgent
+from .hapi_agent import HAPIAgent
+from .stream_agent import StreamAgent
 
 __all__ = [
     "EconomicAgent",
@@ -17,4 +20,7 @@ __all__ = [
     "InfrastructureAgent",
     "DefenseAgent",
     "NewsAgent",
+    "ProtestAgent",
+    "HAPIAgent",
+    "StreamAgent",
 ]

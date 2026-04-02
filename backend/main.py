@@ -39,13 +39,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Import agents
 # ---------------------------------------------------------------------------
-from agents import EconomicAgent, AIInfraAgent, InfrastructureAgent, DefenseAgent, NewsAgent
+from agents import (
+    EconomicAgent, AIInfraAgent, InfrastructureAgent, DefenseAgent, NewsAgent,
+    ProtestAgent, HAPIAgent, StreamAgent,
+)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="India Progress Dashboard API",
+    title="OSINT Protest Map API",
     description=(
         "Real-time data aggregation API for tracking India's economic, "
         "technological, infrastructure, and defense progress."
@@ -73,6 +76,9 @@ _ai_infra_agent = AIInfraAgent(timeout=_timeout)
 _infrastructure_agent = InfrastructureAgent(timeout=_timeout)
 _defense_agent = DefenseAgent(timeout=_timeout)
 _news_agent = NewsAgent(timeout=_timeout)
+_protest_agent = ProtestAgent(timeout=_timeout)
+_hapi_agent = HAPIAgent(timeout=_timeout)
+_stream_agent = StreamAgent(timeout=_timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +213,96 @@ async def get_summary():
     except Exception as exc:
         logger.error("Summary endpoint error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch summary data: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Protest Map Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/api/protests", tags=["protest-map"])
+async def get_protests():
+    """
+    Global protest and demonstration events.
+
+    Sources: GDELT Doc API V2 (always), ACLED (when ACLED_API_KEY + ACLED_EMAIL env vars set).
+
+    Returns geolocated protest events with threat level assessments.
+    """
+    try:
+        data = await _protest_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Protest agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch protest data: {exc}")
+
+
+@app.get("/api/hapi-events", tags=["protest-map"])
+async def get_hapi_events():
+    """
+    Humanitarian conflict/protest events from OCHA HAPI.
+
+    Source: OCHA Humanitarian API (hapi.humdata.org) — Protests and
+    Demonstrations event types.
+
+    Returns geolocated conflict events with threat level and fatality data.
+    """
+    try:
+        data = await _hapi_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("HAPI agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch HAPI data: {exc}")
+
+
+@app.get("/api/streams", tags=["protest-map"])
+async def get_streams():
+    """
+    Live video stream embed URLs and protest imagery.
+
+    Sources: YouTube embed search (no key required) and GDELT image gallery.
+
+    Returns YouTube search embed links for live protest coverage plus
+    recent protest images from GDELT.
+    """
+    try:
+        data = await _stream_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Stream agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch stream data: {exc}")
+
+
+@app.get("/api/protest-map", tags=["protest-map"])
+async def get_protest_map():
+    """
+    Aggregated protest map payload: all three protest data sources fetched concurrently.
+
+    Runs ProtestAgent, HAPIAgent, and StreamAgent in parallel and returns
+    a combined payload.
+    """
+    try:
+        protests, hapi_events, streams = await asyncio.gather(
+            _protest_agent.fetch_data(),
+            _hapi_agent.fetch_data(),
+            _stream_agent.fetch_data(),
+            return_exceptions=True,
+        )
+
+        def _safe(result, label: str):
+            if isinstance(result, Exception):
+                logger.error("%s failed in protest-map: %s", label, result, exc_info=False)
+                return {"error": str(result)}
+            return result
+
+        return {
+            "protests": _safe(protests, "ProtestAgent"),
+            "hapiEvents": _safe(hapi_events, "HAPIAgent"),
+            "streams": _safe(streams, "StreamAgent"),
+            "lastUpdated": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.error("Protest-map endpoint error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch protest map data: {exc}")
 
 
 # ---------------------------------------------------------------------------
