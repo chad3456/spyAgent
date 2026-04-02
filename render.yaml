@@ -1,0 +1,48 @@
+# ─── OSINT Protest Map — Render.com deployment ────────────────────────────────
+#
+# Deploy backend as a free Python web service on Render.
+#
+# Steps:
+#   1. Push this repo to GitHub
+#   2. Go to https://render.com → New → Web Service → connect your GitHub repo
+#   3. Render auto-detects this file and pre-fills the settings
+#   4. Set the env vars listed under envVars below (or in the Render dashboard)
+#   5. Click "Create Web Service"
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: osint-protest-map-api
+    runtime: python
+    region: oregon               # pick closest to your users
+    plan: free                   # free tier: 512 MB RAM, spins down after 15 min idle
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+
+    envVars:
+      # ── REQUIRED ─────────────────────────────────────────────────────────────
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # Comma-separated list of allowed frontend origins.
+      # After deploying to Netlify, set this to your Netlify URL, e.g.:
+      #   https://your-site.netlify.app,https://your-custom-domain.com
+      # Defaults to * (allow all) if not set.
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+      # Request timeout for external API calls (seconds)
+      - key: REQUEST_TIMEOUT
+        value: "30"
+
+      # ── OPTIONAL — ACLED (richer geolocated protest data) ────────────────────
+      # Register free at https://acleddata.com/register/
+      # Without these, the app still works using GDELT + HAPI data.
+      - key: ACLED_API_KEY
+        value: ""          # paste your key here or set in Render dashboard
+
+      - key: ACLED_EMAIL
+        value: ""          # email used when registering at acleddata.com
