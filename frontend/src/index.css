@@ -6,72 +6,91 @@
   --bg-primary: #0a0f1e;
   --bg-card: #0d1b2e;
   --border-color: #1e3a5f;
-  --saffron: #FF9933;
-  --india-green: #138808;
   --text-primary: #e8f0fe;
   --text-muted: #8ba3c0;
+  --critical: #ff2d55;
+  --high: #ff6b35;
+  --medium: #ffd60a;
+  --low: #30d158;
+  --info: #64d2ff;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html {
-  scroll-behavior: smooth;
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
-  margin: 0;
-  padding: 0;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  min-height: 100vh;
 }
 
-#root {
-  min-height: 100vh;
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #2a5080; }
+
+/* ── Leaflet overrides ───────────────────────────────────────────────────── */
+.leaflet-container {
+  background: #0a0f1e !important;
+  font-family: inherit;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.leaflet-popup-content-wrapper {
+  background: #0d1b2e !important;
+  border: 1px solid #1e3a5f !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  padding: 0 !important;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+.leaflet-popup-content {
+  margin: 0 !important;
+  color: #e8f0fe;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
+.leaflet-popup-tip {
+  background: #1e3a5f !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #2a5080;
+.leaflet-popup-close-button {
+  color: #8ba3c0 !important;
+  font-size: 16px !important;
+  top: 4px !important;
+  right: 6px !important;
 }
 
-/* Card component base */
-.card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.25rem;
+.leaflet-popup-close-button:hover { color: #e8f0fe !important; }
+
+.leaflet-control-zoom a {
+  background: #0d1b2e !important;
+  color: #8ba3c0 !important;
+  border-color: #1e3a5f !important;
+}
+.leaflet-control-zoom a:hover { color: #e8f0fe !important; background: #1e3a5f !important; }
+
+.leaflet-control-attribution {
+  background: rgba(10,15,30,0.7) !important;
+  color: #4a6a8a !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a { color: #64d2ff !important; }
+
+/* ── Protest popup ───────────────────────────────────────────────────────── */
+.protest-popup .leaflet-popup-content-wrapper {
+  overflow: hidden;
 }
 
-/* Skeleton shimmer animation */
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    #0d1b2e 25%,
-    #142540 50%,
-    #0d1b2e 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s linear infinite;
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes ping {
+  75%, 100% { transform: scale(2.5); opacity: 0; }
 }
 
 @keyframes shimmer {
@@ -79,38 +98,7 @@ body {
   100% { background-position: 200% 0; }
 }
 
-/* Pulsing live indicator */
-.live-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #22c55e;
-  border-radius: 50%;
-  position: relative;
-}
-
-.live-dot::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background-color: #22c55e;
-  border-radius: 50%;
-  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-  opacity: 0.4;
-}
-
-@keyframes ping {
-  75%, 100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-
-/* Chart tooltip */
-.recharts-tooltip-wrapper {
-  outline: none !important;
-}
-
-/* Line clamp utilities */
+/* ── Utilities ───────────────────────────────────────────────────────────── */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -118,36 +106,5 @@ body {
   overflow: hidden;
 }
 
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Tab underline active */
-.tab-active {
-  border-bottom: 2px solid var(--saffron);
-  color: var(--saffron);
-}
-
-/* Gradient borders */
-.gradient-border-saffron {
-  border-left: 3px solid var(--saffron);
-}
-
-.gradient-border-green {
-  border-left: 3px solid var(--india-green);
-}
-
-/* Number highlight */
-.metric-value {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
-/* Responsive chart container */
-.chart-container {
-  width: 100%;
-  min-height: 200px;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
