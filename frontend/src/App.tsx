@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, Wifi, WifiOff, AlertTriangle, Globe, Map, Video, List } from 'lucide-react'
+import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import type { ProtestEvent, HAPIEvent, FilterState } from './types/protest'
 import { DEFAULT_FILTERS } from './types/protest'
@@ -110,7 +110,7 @@ const App: React.FC = () => {
     }
   }, [])
 
-  const { data: mapData, isLoading: mapLoading, error: mapError, refetch } = useProtestMap()
+  const { data: mapData, isLoading: mapLoading, refetch } = useProtestMap()
   const { data: streamData, isLoading: streamLoading } = useStreams()
 
   const protests = useMemo<ProtestEvent[]>(() => mapData?.protests?.events ?? [], [mapData])
@@ -150,24 +150,11 @@ const App: React.FC = () => {
           totalEvents={totalEvents}
           threatSummary={threatSummary}
           countriesCount={countriesCount}
-          isLive={!mapLoading && !mapError}
+          isLive={!mapLoading}
           lastUpdated={lastUpdated}
         />
         <FilterBar filters={filters} onChange={setFilters} />
       </div>
-
-      {/* Error banner */}
-      {mapError && (
-        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-900/30 border-b border-red-500/30">
-          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="text-red-300 text-xs">
-            Failed to load protest data. Backend may be starting up — retrying automatically…
-          </span>
-          <button onClick={() => refetch()} className="ml-auto text-xs text-red-400 hover:text-red-300 underline">
-            Retry now
-          </button>
-        </div>
-      )}
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
