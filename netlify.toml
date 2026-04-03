@@ -1,10 +1,12 @@
 # ─── OSINT Protest Map — Netlify configuration ────────────────────────────────
 #
-# Frontend deploys to Netlify (free static CDN).
-# Backend runs on Render.com (free Python web service).
+# ZERO BACKEND REQUIRED for demo/preview mode.
+# VITE_USE_DEMO=true (set below) loads all data from bundled TypeScript —
+# no Render, no Railway, no server of any kind.
 #
-# Required Netlify env var (set in Site Settings → Environment Variables):
-#   VITE_API_BASE_URL  =  https://<your-render-service>.onrender.com/api
+# To connect a live backend later, add:
+#   VITE_API_BASE_URL = https://<your-backend>.onrender.com/api
+#   VITE_USE_DEMO     = false
 #
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -14,9 +16,11 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION   = "20"
+  # Demo mode: loads bundled data, no backend server needed
+  VITE_USE_DEMO  = "true"
 
-# ── SPA fallback (React Router / client-side navigation) ─────────────────────
+# ── SPA fallback ──────────────────────────────────────────────────────────────
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
@@ -31,7 +35,7 @@
     Referrer-Policy        = "strict-origin-when-cross-origin"
     Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
 
-# ── Cache static assets aggressively ─────────────────────────────────────────
+# ── Cache static assets ───────────────────────────────────────────────────────
 [[headers]]
   for = "/assets/*"
   [headers.values]
