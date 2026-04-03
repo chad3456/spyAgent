@@ -45,6 +45,16 @@ class StreamAgent(BaseAgent):
         live_streams = self._build_youtube_streams()
         images = await self._fetch_protest_images()
 
+        # Supplement with demo images if GDELT images unavailable
+        if not images:
+            try:
+                import sys, os
+                sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+                from demo_data import DEMO_IMAGES
+                images = DEMO_IMAGES
+            except Exception:
+                pass
+
         return {
             "liveStreams": live_streams,
             "images": images,

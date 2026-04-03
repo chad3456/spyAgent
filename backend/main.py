@@ -281,13 +281,23 @@ async def get_streams():
 
 
 @app.get("/api/protest-map", tags=["protest-map"])
-async def get_protest_map():
+async def get_protest_map(demo: bool = False):
     """
     Aggregated protest map payload: all three protest data sources fetched concurrently.
 
-    Runs ProtestAgent, HAPIAgent, and StreamAgent in parallel and returns
-    a combined payload.
+    Add ?demo=true to skip live API calls and return rich seed data instantly
+    (useful for previews, screenshots, and testing without API keys).
     """
+    if demo:
+        from demo_data import get_demo_protests, get_demo_hapi, get_demo_streams
+        return {
+            "protests": get_demo_protests(),
+            "hapiEvents": get_demo_hapi(),
+            "streams": get_demo_streams(),
+            "lastUpdated": datetime.now(timezone.utc).isoformat(),
+            "isDemo": True,
+        }
+
     try:
         protests, hapi_events, streams = await asyncio.gather(
             _protest_agent.fetch_data(),

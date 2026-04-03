@@ -191,6 +191,16 @@ class HAPIAgent(BaseAgent):
                 seen.add(eid)
                 deduped.append(ev)
 
+        if not deduped:
+            logger.warning("No HAPI data returned — serving demo seed data")
+            try:
+                import sys, os
+                sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+                from demo_data import get_demo_hapi
+                return get_demo_hapi()
+            except Exception as e:
+                logger.error("Failed to load HAPI demo data: %s", e)
+
         return {
             "conflictEvents": deduped,
             "totalCount": len(deduped),
