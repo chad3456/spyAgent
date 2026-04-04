@@ -11,9 +11,6 @@ import type {
 // In development, falls back to the Vite proxy (/api → localhost:8000/api).
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api'
 
-// Set VITE_USE_DEMO=true to load instant seed data (no external API calls needed).
-const USE_DEMO = import.meta.env.VITE_USE_DEMO === 'true'
-
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 30_000,
@@ -35,7 +32,6 @@ export async function fetchStreams(): Promise<StreamsResponse> {
 }
 
 export async function fetchProtestMap(): Promise<ProtestMapResponse> {
-  const params = USE_DEMO ? { demo: 'true' } : {}
-  const { data } = await api.get<ProtestMapResponse>('/protest-map', { params })
+  const { data } = await api.get<ProtestMapResponse>('/protest-map')
   return data
 }
