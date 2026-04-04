@@ -3,25 +3,30 @@ import { fetchProtestMap, fetchStreams } from '../api/protests'
 import { DEMO_MAP_DATA } from '../data/demoData'
 import type { ProtestMapResponse, StreamsResponse } from '../types/protest'
 
-// Use demo data when:
-//  1. No backend URL has been configured (pure static Netlify deploy), OR
-//  2. VITE_USE_DEMO is explicitly set to "true"
-// This means the app always shows data — it never shows a blank map.
+// No backend URL configured = use bundled demo data.
+// Boolean(undefined) = false when VITE_API_BASE_URL is not set at build time.
 const HAS_BACKEND = Boolean(import.meta.env.VITE_API_BASE_URL)
-const IS_DEMO = !HAS_BACKEND || import.meta.env.VITE_USE_DEMO === 'true'
 
-async function fetchWithDemoFallback(): Promise<ProtestMapResponse> {
-  if (IS_DEMO) return DEMO_MAP_DATA
+// ---------------------------------------------------------------------------
+// When HAS_BACKEND is false we pass `initialData` directly to useQuery.
+// React Query treats initialData as already-fresh data:
+//   - isLoading = false immediately (no spinner, no async lifecycle)
+//   - queryFn is NEVER called (staleTime: Infinity prevents re-fetch)
+//   - data is available on the very first render
+// This is the safest possible approach — no env var needed, no network call.
+// ---------------------------------------------------------------------------
+const STATIC_DATA: ProtestMapResponse | undefined = HAS_BACKEND ? undefined : DEMO_MAP_DATA
+const STATIC_STREAMS: StreamsResponse | undefined = HAS_BACKEND ? undefined : DEMO_MAP_DATA.streams
+
+async function fetchMapWithFallback(): Promise<ProtestMapResponse> {
   try {
     return await fetchProtestMap()
   } catch {
-    // Backend unreachable — fall back to demo data silently
     return DEMO_MAP_DATA
   }
 }
 
 async function fetchStreamsWithFallback(): Promise<StreamsResponse> {
-  if (IS_DEMO) return DEMO_MAP_DATA.streams
   try {
     return await fetchStreams()
   } catch {
@@ -32,10 +37,12 @@ async function fetchStreamsWithFallback(): Promise<StreamsResponse> {
 export function useProtestMap() {
   return useQuery({
     queryKey: ['protest-map'],
-    queryFn: fetchWithDemoFallback,
-    staleTime: IS_DEMO ? Infinity : 5 * 60 * 1000,
-    refetchInterval: IS_DEMO ? false : 5 * 60 * 1000,
-    retry: 0, // fallback handled inside queryFn — no React Query retries needed
+    // queryFn is only called when HAS_BACKEND=true (initialData not set)
+    queryFn: fetchMapWithFallback,
+    initialData: STATIC_DATA,
+    staleTime: HAS_BACKEND ? 5 * 60 * 1000 : Infinity,
+    refetchInterval: HAS_BACKEND ? 5 * 60 * 1000 : false,
+    retry: 0,
   })
 }
 
@@ -43,8 +50,9 @@ export function useStreams() {
   return useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreamsWithFallback,
-    staleTime: IS_DEMO ? Infinity : 10 * 60 * 1000,
-    refetchInterval: IS_DEMO ? false : 10 * 60 * 1000,
+    initialData: STATIC_STREAMS,
+    staleTime: HAS_BACKEND ? 10 * 60 * 1000 : Infinity,
+    refetchInterval: HAS_BACKEND ? 10 * 60 * 1000 : false,
     retry: 0,
   })
 }
