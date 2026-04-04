@@ -6,8 +6,13 @@ import type {
   ProtestMapResponse,
 } from '../types/protest'
 
+// In production (Netlify), set VITE_API_BASE_URL to your Render backend URL:
+//   https://<your-render-service>.onrender.com/api
+// In development, falls back to the Vite proxy (/api → localhost:8000/api).
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   timeout: 30_000,
 })
 

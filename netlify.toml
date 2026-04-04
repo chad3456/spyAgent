@@ -1,0 +1,42 @@
+# ─── OSINT Protest Map — Netlify configuration ────────────────────────────────
+#
+# ZERO BACKEND REQUIRED for demo/preview mode.
+# VITE_USE_DEMO=true (set below) loads all data from bundled TypeScript —
+# no Render, no Railway, no server of any kind.
+#
+# To connect a live backend later, add:
+#   VITE_API_BASE_URL = https://<your-backend>.onrender.com/api
+#   VITE_USE_DEMO     = false
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+[build]
+  base    = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION   = "20"
+  # Demo mode: loads bundled data, no backend server needed
+  VITE_USE_DEMO  = "true"
+
+# ── SPA fallback ──────────────────────────────────────────────────────────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ── Security headers ──────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+
+# ── Cache static assets ───────────────────────────────────────────────────────
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

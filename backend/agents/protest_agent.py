@@ -398,6 +398,17 @@ class ProtestAgent(BaseAgent):
 
         unique_sources = list(dict.fromkeys(sources))  # preserve order, deduplicate
 
+        # If no live data was returned (network blocked / APIs down), use demo data
+        if not deduped:
+            logger.warning("No live protest data fetched — serving demo seed data")
+            try:
+                import sys, os
+                sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+                from demo_data import get_demo_protests
+                return get_demo_protests()
+            except Exception as e:
+                logger.error("Failed to load demo data: %s", e)
+
         return {
             "events": deduped,
             "totalCount": len(deduped),

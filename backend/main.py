@@ -1,16 +1,17 @@
 """
-India Progress Dashboard - FastAPI Backend
-==========================================
+OSINT Protest Map - FastAPI Backend
+====================================
 
-Multi-agent system that aggregates real-time data from:
-  - World Bank Open API
-  - IMF DataMapper API
-  - GDELT News API
-  - Multiple RSS feeds (Economic Times, PIB, Business Standard)
-  - Optional: NewsAPI, GNews (via env vars)
+Multi-agent system that aggregates real-time protest/unrest data from:
+  - GDELT Document API V2 (free, no key)
+  - OCHA HAPI Conflict Events (free, no key)
+  - ACLED API (optional, set ACLED_API_KEY + ACLED_EMAIL env vars)
+  - YouTube embed search + GDELT image gallery (streams)
 
-Run with:
+Run locally:
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+Deploy to Render.com — see /render.yaml in repo root.
 """
 
 import asyncio
@@ -58,12 +59,19 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Allow all origins for development (tighten in production)
+# CORS — controlled via ALLOWED_ORIGINS env var.
+# Default "*" works for development and initial deploys.
+# In production set: ALLOWED_ORIGINS=https://your-site.netlify.app
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "*").strip()
+_allow_origins: list[str] = (
+    ["*"] if _raw_origins == "*" else [o.strip() for o in _raw_origins.split(",") if o.strip()]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=_allow_origins,
+    allow_credentials=_raw_origins != "*",
+    allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -273,13 +281,23 @@ async def get_streams():
 
 
 @app.get("/api/protest-map", tags=["protest-map"])
-async def get_protest_map():
+async def get_protest_map(demo: bool = False):
     """
     Aggregated protest map payload: all three protest data sources fetched concurrently.
 
-    Runs ProtestAgent, HAPIAgent, and StreamAgent in parallel and returns
-    a combined payload.
+    Add ?demo=true to skip live API calls and return rich seed data instantly
+    (useful for previews, screenshots, and testing without API keys).
     """
+    if demo:
+        from demo_data import get_demo_protests, get_demo_hapi, get_demo_streams
+        return {
+            "protests": get_demo_protests(),
+            "hapiEvents": get_demo_hapi(),
+            "streams": get_demo_streams(),
+            "lastUpdated": datetime.now(timezone.utc).isoformat(),
+            "isDemo": True,
+        }
+
     try:
         protests, hapi_events, streams = await asyncio.gather(
             _protest_agent.fetch_data(),
