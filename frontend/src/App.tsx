@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle } from 'lucide-react'
+import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle, Globe2 } from 'lucide-react'
 import clsx from 'clsx'
 import type { ProtestEvent, HAPIEvent, FilterState } from './types/protest'
 import { DEFAULT_FILTERS } from './types/protest'
@@ -10,10 +10,11 @@ import { EventSidebar } from './components/EventSidebar'
 import { VideoPanel } from './components/VideoPanel'
 import { EventModal } from './components/EventModal'
 import { ProtestMap } from './components/ProtestMap'
+import { OSINTGlobe } from './components/OSINTGlobe'
 
 type AnyEvent = ProtestEvent | HAPIEvent
 type PanelTab = 'events' | 'video'
-type ViewMode = 'split' | 'fullmap' | 'fulllist'
+type ViewMode = 'split' | 'fullmap' | 'fulllist' | 'globe3d'
 
 const LiveBadge: React.FC = () => (
   <div className="flex items-center gap-1.5">
@@ -35,8 +36,8 @@ const Header: React.FC<{
           <Globe className="w-4 h-4 text-white" />
         </div>
         <div>
-          <h1 className="text-[#e8f0fe] font-bold text-sm leading-tight">OSINT Protest Map</h1>
-          <p className="text-[#8ba3c0] text-[10px] leading-tight">Global Civil Unrest Intelligence</p>
+          <h1 className="text-[#e8f0fe] font-bold text-sm leading-tight">OSINT Intelligence Map</h1>
+          <p className="text-[#8ba3c0] text-[10px] leading-tight">Global Multi-Domain Intelligence Platform</p>
         </div>
       </div>
 
@@ -47,7 +48,8 @@ const Header: React.FC<{
         {(
           [
             { id: 'split' as const, icon: <List className="w-3.5 h-3.5" />, label: 'Split' },
-            { id: 'fullmap' as const, icon: <Map className="w-3.5 h-3.5" />, label: 'Map' },
+            { id: 'fullmap' as const, icon: <Map className="w-3.5 h-3.5" />, label: '2D Map' },
+            { id: 'globe3d' as const, icon: <Globe2 className="w-3.5 h-3.5" />, label: '3D Globe' },
             { id: 'fulllist' as const, icon: <List className="w-3.5 h-3.5" />, label: 'List' },
           ]
         ).map(({ id, icon, label }) => (
@@ -58,7 +60,9 @@ const Header: React.FC<{
             className={clsx(
               'flex items-center gap-1 px-2 py-1 rounded text-xs transition-all border',
               viewMode === id
-                ? 'bg-[#1e3a5f] border-[#64d2ff] text-[#64d2ff]'
+                ? id === 'globe3d'
+                  ? 'bg-[#1e3a5f] border-[#ffd60a] text-[#ffd60a]'
+                  : 'bg-[#1e3a5f] border-[#64d2ff] text-[#64d2ff]'
                 : 'bg-transparent border-[#1e3a5f] text-[#8ba3c0] hover:text-[#e8f0fe]'
             )}
           >
@@ -135,6 +139,23 @@ const App: React.FC = () => {
     setModalEvent(e)
   }, [])
 
+  // Full-screen 3D globe mode
+  if (viewMode === 'globe3d') {
+    return (
+      <div className="flex flex-col h-screen bg-[#020810] text-[#e8f0fe] overflow-hidden">
+        <Header
+          online={online}
+          onRefresh={() => refetch()}
+          viewMode={viewMode}
+          onViewMode={setViewMode}
+        />
+        <div className="flex-1 overflow-hidden">
+          <OSINTGlobe protests={protests} hapiEvents={hapiEvents} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-screen bg-[#0a0f1e] text-[#e8f0fe] overflow-hidden">
       <Header
@@ -165,8 +186,8 @@ const App: React.FC = () => {
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0f1e]/80">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-2 border-[#64d2ff] border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[#8ba3c0] text-sm">Aggregating global protest data…</span>
-                  <span className="text-[#8ba3c0] text-xs">GDELT · HAPI/OCHA · ACLED</span>
+                  <span className="text-[#8ba3c0] text-sm">Aggregating global intelligence data…</span>
+                  <span className="text-[#8ba3c0] text-xs">GDELT · HAPI/OCHA · ACLED · OpenSky · USGS</span>
                 </div>
               </div>
             )}
@@ -243,7 +264,7 @@ const App: React.FC = () => {
             <div className="flex-shrink-0 border-t border-[#1e3a5f] px-3 py-2">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[9px] text-[#8ba3c0] uppercase tracking-wider">Sources:</span>
-                {['GDELT', 'HAPI/OCHA', 'ACLED*', 'ReliefWeb'].map((src) => (
+                {['GDELT', 'HAPI/OCHA', 'ACLED*', 'OpenSky', 'USGS', 'Celestrak'].map((src) => (
                   <span
                     key={src}
                     className="text-[9px] px-1.5 py-0.5 bg-[#1e3a5f]/60 border border-[#1e3a5f] rounded text-[#64d2ff]"

@@ -1,5 +1,5 @@
 """
-India Progress Dashboard - Multi-Agent System
+OSINT Intelligence Platform - Multi-Agent System
 
 Each agent is responsible for fetching and processing data
 from a specific domain using real external APIs.
@@ -14,7 +14,20 @@ from .protest_agent import ProtestAgent
 from .hapi_agent import HAPIAgent
 from .stream_agent import StreamAgent
 
+# New OSINT intelligence agents
+from .flight_agent import FlightAgent
+from .military_flight_agent import MilitaryFlightAgent
+from .vessel_agent import VesselAgent
+from .earthquake_agent import EarthquakeAgent
+from .ddos_agent import DDoSAgent
+from .satellite_agent import SatelliteAgent
+from .health_agent import HealthAgent
+from .datacenter_agent import DatacenterAgent
+from .social_media_agent import SocialMediaAgent
+from .news_intel_agent import NewsIntelAgent
+
 __all__ = [
+    # Existing agents
     "EconomicAgent",
     "AIInfraAgent",
     "InfrastructureAgent",
@@ -23,4 +36,15 @@ __all__ = [
     "ProtestAgent",
     "HAPIAgent",
     "StreamAgent",
+    # New OSINT agents
+    "FlightAgent",
+    "MilitaryFlightAgent",
+    "VesselAgent",
+    "EarthquakeAgent",
+    "DDoSAgent",
+    "SatelliteAgent",
+    "HealthAgent",
+    "DatacenterAgent",
+    "SocialMediaAgent",
+    "NewsIntelAgent",
 ]

@@ -1,11 +1,20 @@
 """
-OSINT Protest Map - FastAPI Backend
-====================================
+OSINT Intelligence Platform - FastAPI Backend
+=============================================
 
-Multi-agent system that aggregates real-time protest/unrest data from:
+Multi-agent system that aggregates real-time global intelligence data from:
   - GDELT Document API V2 (free, no key)
   - OCHA HAPI Conflict Events (free, no key)
-  - ACLED API (optional, set ACLED_API_KEY + ACLED_EMAIL env vars)
+  - ACLED API (optional: ACLED_API_KEY + ACLED_EMAIL env vars)
+  - OpenSky Network — live aircraft positions (free, no key)
+  - ADS-B data — military aircraft detection (free)
+  - USGS Earthquake Hazards Program (free, no key)
+  - Cloudflare Radar API — DDoS attacks (optional: CF_RADAR_TOKEN)
+  - Celestrak TLE + sgp4 — satellite positions (free, no key)
+  - WHO RSS + World Bank — health alerts & vaccination (free)
+  - PeeringDB + static cloud regions — datacenter infrastructure (free)
+  - Twitter/X API v2 — verified geopolitical feeds (optional: TWITTER_BEARER_TOKEN)
+  - NewsAPI + RSS feeds — intelligence news (optional: NEWS_API_KEY)
   - YouTube embed search + GDELT image gallery (streams)
 
 Run locally:
@@ -43,18 +52,21 @@ logger = logging.getLogger(__name__)
 from agents import (
     EconomicAgent, AIInfraAgent, InfrastructureAgent, DefenseAgent, NewsAgent,
     ProtestAgent, HAPIAgent, StreamAgent,
+    FlightAgent, MilitaryFlightAgent, VesselAgent, EarthquakeAgent, DDoSAgent,
+    SatelliteAgent, HealthAgent, DatacenterAgent, SocialMediaAgent, NewsIntelAgent,
 )
 
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="OSINT Protest Map API",
+    title="OSINT Intelligence Platform API",
     description=(
-        "Real-time data aggregation API for tracking India's economic, "
-        "technological, infrastructure, and defense progress."
+        "Multi-domain real-time intelligence API: civil unrest, live flights, "
+        "vessel tracking, earthquakes, DDoS attacks, satellites, health alerts, "
+        "datacenter infrastructure, social feeds, and news intelligence."
     ),
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -79,6 +91,8 @@ app.add_middleware(
 # Agent singletons (shared cache)
 # ---------------------------------------------------------------------------
 _timeout = float(os.environ.get("REQUEST_TIMEOUT", "30"))
+
+# Existing agents
 _economic_agent = EconomicAgent(timeout=_timeout)
 _ai_infra_agent = AIInfraAgent(timeout=_timeout)
 _infrastructure_agent = InfrastructureAgent(timeout=_timeout)
@@ -87,6 +101,18 @@ _news_agent = NewsAgent(timeout=_timeout)
 _protest_agent = ProtestAgent(timeout=_timeout)
 _hapi_agent = HAPIAgent(timeout=_timeout)
 _stream_agent = StreamAgent(timeout=_timeout)
+
+# New OSINT intelligence agents
+_flight_agent = FlightAgent(timeout=_timeout)
+_military_flight_agent = MilitaryFlightAgent(timeout=_timeout)
+_vessel_agent = VesselAgent(timeout=_timeout)
+_earthquake_agent = EarthquakeAgent(timeout=_timeout)
+_ddos_agent = DDoSAgent(timeout=_timeout)
+_satellite_agent = SatelliteAgent(timeout=_timeout)
+_health_agent = HealthAgent(timeout=_timeout)
+_datacenter_agent = DatacenterAgent(timeout=_timeout)
+_social_media_agent = SocialMediaAgent(timeout=_timeout)
+_news_intel_agent = NewsIntelAgent(timeout=_timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +347,189 @@ async def get_protest_map(demo: bool = False):
     except Exception as exc:
         logger.error("Protest-map endpoint error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch protest map data: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# OSINT Intelligence Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/api/flights", tags=["osint"])
+async def get_flights():
+    """
+    Live civil aircraft positions from OpenSky Network.
+    Free API, no key required. Returns up to 500 airborne aircraft.
+    """
+    try:
+        data = await _flight_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Flight agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch flight data: {exc}")
+
+
+@app.get("/api/military-flights", tags=["osint"])
+async def get_military_flights():
+    """
+    Military aircraft positions detected via ADS-B / OpenSky callsign filtering.
+    Identifies aircraft with military callsign prefixes and ICAO hex ranges.
+    """
+    try:
+        data = await _military_flight_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Military flight agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch military flight data: {exc}")
+
+
+@app.get("/api/vessels", tags=["osint"])
+async def get_vessels():
+    """
+    Ship and vessel positions from AIS data sources.
+    Includes commercial, military, and cargo vessels.
+    """
+    try:
+        data = await _vessel_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Vessel agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch vessel data: {exc}")
+
+
+@app.get("/api/earthquakes", tags=["osint"])
+async def get_earthquakes():
+    """
+    Real-time earthquake data from USGS Earthquake Hazards Program.
+    Returns M2.5+ earthquakes from the past 7 days with severity classification.
+    """
+    try:
+        data = await _earthquake_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Earthquake agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch earthquake data: {exc}")
+
+
+@app.get("/api/ddos", tags=["osint"])
+async def get_ddos():
+    """
+    DDoS attack data by country with severity classification.
+    Sources: Cloudflare Radar API (set CF_RADAR_TOKEN env var) with GDELT fallback.
+    Bubble visualization data for country-level attack intensity.
+    """
+    try:
+        data = await _ddos_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("DDoS agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch DDoS data: {exc}")
+
+
+@app.get("/api/satellites", tags=["osint"])
+async def get_satellites():
+    """
+    Live satellite positions computed from Celestrak TLE data using sgp4 propagation.
+    Returns positions for ISS, weather, navigation, and Earth observation satellites.
+    """
+    try:
+        data = await _satellite_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Satellite agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch satellite data: {exc}")
+
+
+@app.get("/api/health", tags=["osint"])
+async def get_health():
+    """
+    Health alerts and disease outbreaks from WHO RSS, CDC, and ReliefWeb.
+    Also returns vaccination coverage data from World Bank.
+    """
+    try:
+        data = await _health_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Health agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch health data: {exc}")
+
+
+@app.get("/api/datacenters", tags=["osint"])
+async def get_datacenters():
+    """
+    Data infrastructure locations: datacenters, cloud regions, and internet exchanges.
+    Sources: PeeringDB API (free), static AWS/GCP/Azure region data, EpochAI datasets.
+    """
+    try:
+        data = await _datacenter_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Datacenter agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch datacenter data: {exc}")
+
+
+@app.get("/api/social-feeds", tags=["osint"])
+async def get_social_feeds():
+    """
+    Verified geopolitical intelligence from curated social media accounts.
+    Sources: Twitter/X API v2 (set TWITTER_BEARER_TOKEN) with RSS fallback.
+    Covers war, conflict, military, NATO, and geopolitical developments.
+    """
+    try:
+        data = await _social_media_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("Social media agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch social feeds: {exc}")
+
+
+@app.get("/api/news-intel", tags=["osint"])
+async def get_news_intel():
+    """
+    Aggregated intelligence news from verified sources.
+    Sources: NewsAPI (set NEWS_API_KEY) with multi-source RSS fallback.
+    Categories: geopolitics, defense, conflict, cyber, diplomacy.
+    """
+    try:
+        data = await _news_intel_agent.fetch_data()
+        return data
+    except Exception as exc:
+        logger.error("News intel agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch news intelligence: {exc}")
+
+
+@app.get("/api/osint-summary", tags=["osint"])
+async def get_osint_summary():
+    """
+    Combined OSINT summary: all intelligence layers fetched concurrently.
+    Includes flights, vessels, earthquakes, DDoS, satellites, health, and datacenters.
+    """
+    try:
+        results = await asyncio.gather(
+            _flight_agent.fetch_data(),
+            _vessel_agent.fetch_data(),
+            _earthquake_agent.fetch_data(),
+            _ddos_agent.fetch_data(),
+            _satellite_agent.fetch_data(),
+            _health_agent.fetch_data(),
+            _datacenter_agent.fetch_data(),
+            return_exceptions=True,
+        )
+
+        labels = ["flights", "vessels", "earthquakes", "ddos", "satellites", "health", "datacenters"]
+
+        def _safe(result, label: str):
+            if isinstance(result, Exception):
+                logger.error("%s failed in osint-summary: %s", label, result)
+                return {"error": str(result)}
+            return result
+
+        return {
+            label: _safe(result, label)
+            for label, result in zip(labels, results)
+        } | {"lastUpdated": datetime.now(timezone.utc).isoformat()}
+
+    except Exception as exc:
+        logger.error("OSINT summary error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT summary: {exc}")
 
 
 # ---------------------------------------------------------------------------
