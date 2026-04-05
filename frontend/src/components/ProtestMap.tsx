@@ -174,6 +174,8 @@ export interface OSINTLayerData {
   healthOutbreaks: HealthOutbreak[]
   datacenters: DatacenterFacility[]
   activeLayers: Set<LayerKey>
+  loadingLayers?: Set<LayerKey>
+  errorLayers?: Set<LayerKey>
 }
 
 interface ProtestMapProps {
@@ -345,10 +347,11 @@ export const ProtestMap: React.FC<ProtestMapProps> = ({
         const marker = L.marker([sat.lat, sat.lon], { icon: createDotIcon('#ffd60a', 10, '🛰') })
         marker.bindPopup(L.popup({ maxWidth: 200 }).setContent(
           genericPopup('🛰 Satellite', sat.name, '#ffd60a', [
-            ['Name', sat.name],
-            ['Category', sat.type],
+            ['Category', sat.category],
+            ['Orbit', sat.orbitType],
             ['Altitude', sat.altitude != null ? Math.round(sat.altitude) + ' km' : undefined],
-            ['Velocity', sat.velocity != null ? sat.velocity + ' km/s' : undefined],
+            ['Velocity', sat.velocity_kmh != null ? Math.round(sat.velocity_kmh).toLocaleString() + ' km/h' : undefined],
+            ['Agency', sat.agency],
           ])
         ))
         layer.addLayer(marker)
@@ -464,15 +467,39 @@ export const ProtestMap: React.FC<ProtestMapProps> = ({
         )}
       </div>
 
-      {/* No-data notice when flights enabled but empty */}
-      {osint?.activeLayers.has('flights') && osint.flights.length === 0 && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-[#0d1b2e]/90 border border-[#64d2ff]/30 rounded-xl px-5 py-4 text-center pointer-events-none max-w-xs">
-          <div className="text-2xl mb-2">✈</div>
-          <p className="text-[#e8f0fe] text-sm font-semibold">Fetching Live Flights…</p>
-          <p className="text-[#8ba3c0] text-[11px] mt-1">Connecting to OpenSky Network, adsb.lol, and airplanes.live</p>
-          <p className="text-[#8ba3c0]/60 text-[10px] mt-2">Ensure backend is running at localhost:8000</p>
-        </div>
-      )}
+      {/* Flight status overlay — loading / error / no-data */}
+      {osint?.activeLayers.has('flights') && osint.flights.length === 0 && (() => {
+        const loading = osint.loadingLayers?.has('flights')
+        const error   = osint.errorLayers?.has('flights')
+        return (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-[#0d1b2e]/90 border border-[#64d2ff]/30 rounded-xl px-5 py-4 text-center pointer-events-none max-w-xs">
+            <div className="text-2xl mb-2">{error ? '⚠️' : '✈'}</div>
+            {loading && (
+              <>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <div className="w-3 h-3 border-2 border-[#64d2ff] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#64d2ff] text-sm font-semibold">Fetching Live Flights…</p>
+                </div>
+                <p className="text-[#8ba3c0] text-[11px]">Querying OpenSky, adsb.lol, airplanes.live</p>
+              </>
+            )}
+            {!loading && error && (
+              <>
+                <p className="text-[#ff6b35] text-sm font-semibold">Backend Unreachable</p>
+                <p className="text-[#8ba3c0] text-[11px] mt-1">Could not connect to the API server.</p>
+                <p className="text-[#8ba3c0]/70 text-[10px] mt-1">Check that the backend is running and <code className="text-[#64d2ff]">/api/flights</code> is accessible.</p>
+              </>
+            )}
+            {!loading && !error && (
+              <>
+                <p className="text-[#e8f0fe] text-sm font-semibold">No Aircraft Data</p>
+                <p className="text-[#8ba3c0] text-[11px] mt-1">Flight APIs returned no aircraft.</p>
+                <p className="text-[#8ba3c0]/70 text-[10px] mt-1">OpenSky may be rate-limiting. Data refreshes every 30 s.</p>
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Event count badge */}
       <div className="absolute top-3 left-3 z-[1000] bg-[#0d1b2e]/90 border border-[#1e3a5f] rounded-lg px-2.5 py-1.5 backdrop-blur-sm flex items-center gap-2">

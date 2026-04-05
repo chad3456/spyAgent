@@ -16,7 +16,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 45_000,
+  timeout: 35_000,   // backend itself allows up to 30 s per source; give it a 5 s buffer
 })
 
 export async function fetchFlights(): Promise<FlightsResponse> {

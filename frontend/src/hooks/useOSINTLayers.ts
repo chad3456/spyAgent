@@ -43,7 +43,16 @@ function layerQuery<T>(
 }
 
 export function useFlights(enabled: boolean) {
-  return layerQuery<FlightsResponse>('flights', fetchFlights, enabled, 30_000)
+  // retry: 0 — backend already tries 3 ADS-B sources internally.
+  // No point retrying at the frontend level and doubling the wait time.
+  return useQuery<FlightsResponse>({
+    queryKey: ['flights'],
+    queryFn: fetchFlights,
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: enabled ? 30_000 : false,
+    retry: 0,
+  })
 }
 
 export function useMilitaryFlights(enabled: boolean) {

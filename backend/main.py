@@ -475,6 +475,62 @@ async def get_satellites():
         raise HTTPException(status_code=502, detail=f"Failed to fetch satellite data: {exc}")
 
 
+@app.get("/api/satellites/test", tags=["osint"])
+async def test_satellites():
+    """
+    Diagnostic endpoint: tests N2YO and Celestrak connectivity for satellite TLE data.
+    Returns which TLE sources are reachable and whether N2YO_API_KEY is configured.
+    GET /api/satellites/test
+    """
+    import httpx as _httpx
+
+    n2yo_key = os.environ.get("N2YO_API_KEY", "").strip()
+
+    async def _probe_celestrak(url: str, name: str) -> dict:
+        try:
+            async with _httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
+                r = await c.get(url)
+                if r.status_code == 200:
+                    lines = [l for l in r.text.splitlines() if l.strip()]
+                    return {"source": name, "status": "ok", "http": 200, "tle_entries": len(lines) // 3}
+                return {"source": name, "status": "error", "http": r.status_code}
+        except Exception as e:
+            return {"source": name, "status": "unreachable", "http": 0, "error": str(e)[:120]}
+
+    async def _probe_n2yo() -> dict:
+        if not n2yo_key:
+            return {"source": "n2yo", "status": "not_configured", "note": "Set N2YO_API_KEY env var"}
+        # Test with ISS (NORAD 25544)
+        url = f"https://api.n2yo.com/rest/v1/satellite/tle/25544&apiKey={n2yo_key}"
+        try:
+            async with _httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
+                r = await c.get(url)
+                if r.status_code == 200:
+                    data = r.json()
+                    has_tle = bool(data.get("tle", "").strip())
+                    return {"source": "n2yo", "status": "ok", "http": 200, "has_tle": has_tle,
+                            "sat_name": data.get("info", {}).get("satname", "?")}
+                return {"source": "n2yo", "status": "error", "http": r.status_code}
+        except Exception as e:
+            return {"source": "n2yo", "status": "unreachable", "http": 0, "error": str(e)[:120]}
+
+    results = await asyncio.gather(
+        _probe_n2yo(),
+        _probe_celestrak("https://celestrak.org/pub/TLE/stations.txt", "celestrak-stations"),
+        _probe_celestrak("https://celestrak.org/pub/TLE/weather.txt", "celestrak-weather"),
+        _probe_celestrak("https://celestrak.org/pub/TLE/gps-ops.txt", "celestrak-gps"),
+    )
+    reachable = [r for r in results if r.get("status") == "ok"]
+    return {
+        "sources": list(results),
+        "n2yo_configured": bool(n2yo_key),
+        "reachable": len(reachable),
+        "active_source": "n2yo+sgp4" if n2yo_key and results[0].get("status") == "ok" else "celestrak+sgp4",
+        "curated_satellites": 32,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/api/health", tags=["osint"])
 async def get_health():
     """
