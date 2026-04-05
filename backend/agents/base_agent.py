@@ -7,7 +7,6 @@ Base agent providing common utilities for all domain agents:
 - Shared TTL cache
 """
 
-import sys
 import re
 import html
 import asyncio
@@ -17,8 +16,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-import feedparser
 from cachetools import TTLCache
+
+try:
+    import feedparser as _feedparser
+    _HAS_FEEDPARSER = True
+except Exception:  # covers ImportError and sgmllib/sgmllib3k issues on old installs
+    _feedparser = None  # type: ignore[assignment]
+    _HAS_FEEDPARSER = False
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +105,11 @@ class BaseAgent(ABC):
                 self._cache[key] = data
                 return data
         except httpx.TimeoutException:
-            logger.error("Timeout fetching %s", url, file=sys.stderr)
+            logger.warning("Timeout fetching %s", url)
         except httpx.HTTPStatusError as exc:
-            logger.error(
-                "HTTP %s fetching %s", exc.response.status_code, url, file=sys.stderr
-            )
+            logger.warning("HTTP %s fetching %s", exc.response.status_code, url)
         except Exception as exc:  # noqa: BLE001
-            logger.error("Error fetching %s: %s", url, exc, file=sys.stderr)
+            logger.warning("Error fetching %s: %s", url, exc)
         return None
 
     async def fetch_text(self, url: str, cache_key: Optional[str] = None) -> Optional[str]:
@@ -129,13 +132,11 @@ class BaseAgent(ABC):
                 self._cache[key] = text
                 return text
         except httpx.TimeoutException:
-            logger.error("Timeout fetching RSS %s", url, file=sys.stderr)
+            logger.warning("Timeout fetching %s", url)
         except httpx.HTTPStatusError as exc:
-            logger.error(
-                "HTTP %s fetching RSS %s", exc.response.status_code, url, file=sys.stderr
-            )
+            logger.warning("HTTP %s fetching %s", exc.response.status_code, url)
         except Exception as exc:  # noqa: BLE001
-            logger.error("Error fetching RSS %s: %s", url, exc, file=sys.stderr)
+            logger.warning("Error fetching %s: %s", url, exc)
         return None
 
     async def fetch_rss(
@@ -156,10 +157,14 @@ class BaseAgent(ABC):
         if not raw:
             return []
 
+        if not _HAS_FEEDPARSER:
+            logger.warning("feedparser unavailable; skipping RSS for %s", url)
+            return []
+
         try:
-            feed = feedparser.parse(raw)
+            feed = _feedparser.parse(raw)
         except Exception as exc:  # noqa: BLE001
-            logger.error("feedparser error for %s: %s", url, exc, file=sys.stderr)
+            logger.error("feedparser error for %s: %s", url, exc)
             return []
 
         items: list[dict] = []
