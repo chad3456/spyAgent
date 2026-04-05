@@ -367,6 +367,43 @@ async def get_flights():
         raise HTTPException(status_code=502, detail=f"Failed to fetch flight data: {exc}")
 
 
+@app.get("/api/flights/test", tags=["osint"])
+async def test_flights():
+    """
+    Diagnostic endpoint: tests all three ADS-B sources and returns their status.
+    Hit this first to verify your environment can reach live flight APIs.
+    GET /api/flights/test
+    """
+    import httpx as _httpx
+
+    async def _probe(url: str, name: str) -> dict:
+        try:
+            async with _httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
+                r = await c.get(url)
+                if r.status_code == 200:
+                    body = r.json()
+                    count = len(
+                        body.get("states") or body.get("ac") or body.get("aircraft") or []
+                    )
+                    return {"source": name, "status": "ok", "http": 200, "count": count}
+                return {"source": name, "status": "error", "http": r.status_code, "count": 0}
+        except Exception as e:
+            return {"source": name, "status": "unreachable", "http": 0, "error": str(e)[:120], "count": 0}
+
+    results = await asyncio.gather(
+        _probe("https://opensky-network.org/api/states/all", "opensky"),
+        _probe("https://api.adsb.lol/v2/aircraft", "adsb.lol"),
+        _probe("https://api.airplanes.live/v2/aircraft", "airplanes.live"),
+    )
+    reachable = [r for r in results if r["status"] == "ok"]
+    return {
+        "sources": results,
+        "reachable": len(reachable),
+        "recommendation": reachable[0]["source"] if reachable else "none — check outbound network access",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/api/military-flights", tags=["osint"])
 async def get_military_flights():
     """

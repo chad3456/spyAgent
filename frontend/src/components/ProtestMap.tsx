@@ -464,11 +464,28 @@ export const ProtestMap: React.FC<ProtestMapProps> = ({
         )}
       </div>
 
+      {/* No-data notice when flights enabled but empty */}
+      {osint?.activeLayers.has('flights') && osint.flights.length === 0 && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] bg-[#0d1b2e]/90 border border-[#64d2ff]/30 rounded-xl px-5 py-4 text-center pointer-events-none max-w-xs">
+          <div className="text-2xl mb-2">✈</div>
+          <p className="text-[#e8f0fe] text-sm font-semibold">Fetching Live Flights…</p>
+          <p className="text-[#8ba3c0] text-[11px] mt-1">Connecting to OpenSky Network, adsb.lol, and airplanes.live</p>
+          <p className="text-[#8ba3c0]/60 text-[10px] mt-2">Ensure backend is running at localhost:8000</p>
+        </div>
+      )}
+
       {/* Event count badge */}
       <div className="absolute top-3 left-3 z-[1000] bg-[#0d1b2e]/90 border border-[#1e3a5f] rounded-lg px-2.5 py-1.5 backdrop-blur-sm flex items-center gap-2">
+        {osint?.activeLayers.has('flights') && (
+          <span className="text-[10px] text-[#64d2ff] font-bold">
+            ✈ {osint.flights.length} flights live
+          </span>
+        )}
+        {allEvents.length > 0 && (
         <span className="text-[10px] text-[#8ba3c0]">
           Events: <span className="text-[#64d2ff] font-bold">{allEvents.length}</span>
         </span>
+        )}
         {osintCount > 0 && (
           <span className="text-[10px] text-[#8ba3c0]">
             | OSINT: <span className="text-[#ffd60a] font-bold">{osintCount}</span>

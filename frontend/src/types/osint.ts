@@ -141,16 +141,16 @@ export const LAYER_CONFIGS: LayerConfig[] = [
 
 export interface Aircraft {
   icao24: string
-  callsign: string
-  country: string
+  callsign?: string
+  country?: string
   lat: number
   lon: number
-  altitude: number
-  velocity: number
-  heading: number
-  vertical_rate: number
-  squawk?: string
-  on_ground: boolean
+  altitude?: number | null
+  velocity?: number | null
+  heading?: number | null
+  vertical_rate?: number | null
+  squawk?: string | null
+  on_ground?: boolean
 }
 
 export interface MilitaryAircraft extends Aircraft {
