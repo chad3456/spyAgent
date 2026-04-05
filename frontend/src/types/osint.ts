@@ -207,11 +207,19 @@ export interface Satellite {
   lat: number
   lon: number
   altitude: number
-  velocity?: number
-  inclination?: number
-  period?: number
-  type: string
-  category: 'station' | 'weather' | 'navigation' | 'earth_obs' | 'military' | 'comms' | 'other'
+  // velocity fields from sgp4 propagation
+  velocity_kms?: number | null
+  velocity_kmh?: number | null
+  inclination?: number | null
+  period_min?: number | null
+  // Human-readable category from curated satellite list
+  // e.g. "Space Station", "Earth Observation", "Weather", "Navigation",
+  //      "Communications", "Commercial", "Military", "Science"
+  category: string
+  description?: string
+  agency?: string
+  orbitType?: 'LEO' | 'MEO' | 'GEO' | 'HEO'
+  source?: string
 }
 
 export interface HealthOutbreak {
@@ -322,6 +330,8 @@ export interface SatellitesResponse {
   satellites: Satellite[]
   total?: number
   categories?: Record<string, number>
+  source?: string         // "n2yo+sgp4" | "celestrak+sgp4"
+  n2yoEnabled?: boolean
   fetchedAt?: string
 }
 

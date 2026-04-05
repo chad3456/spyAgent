@@ -345,10 +345,11 @@ export const ProtestMap: React.FC<ProtestMapProps> = ({
         const marker = L.marker([sat.lat, sat.lon], { icon: createDotIcon('#ffd60a', 10, '🛰') })
         marker.bindPopup(L.popup({ maxWidth: 200 }).setContent(
           genericPopup('🛰 Satellite', sat.name, '#ffd60a', [
-            ['Name', sat.name],
-            ['Category', sat.type],
+            ['Category', sat.category],
+            ['Orbit', sat.orbitType],
             ['Altitude', sat.altitude != null ? Math.round(sat.altitude) + ' km' : undefined],
-            ['Velocity', sat.velocity != null ? sat.velocity + ' km/s' : undefined],
+            ['Velocity', sat.velocity_kmh != null ? Math.round(sat.velocity_kmh).toLocaleString() + ' km/h' : undefined],
+            ['Agency', sat.agency],
           ])
         ))
         layer.addLayer(marker)
