@@ -25,20 +25,19 @@ import type {
   LayerKey,
 } from '../types/osint'
 
-const HAS_BACKEND = Boolean(import.meta.env.VITE_API_BASE_URL)
-
+// Always allow fetching — dev uses the /api Vite proxy, prod uses VITE_API_BASE_URL
 function layerQuery<T>(
   key: LayerKey,
   fetchFn: () => Promise<T>,
   enabled: boolean,
-  refreshInterval: number
+  refreshMs: number
 ) {
-  return useQuery({
+  return useQuery<T>({
     queryKey: [key],
     queryFn: fetchFn,
-    enabled: enabled && HAS_BACKEND,
-    staleTime: refreshInterval,
-    refetchInterval: enabled ? refreshInterval : false,
+    enabled,
+    staleTime: refreshMs,
+    refetchInterval: enabled ? refreshMs : false,
     retry: 1,
   })
 }
@@ -80,8 +79,16 @@ export function useDatacenters(enabled: boolean) {
   return layerQuery<DatacentersResponse>('datacenters', fetchDatacenters, enabled, 86_400_000)
 }
 
-export function useSocialFeeds(enabled: boolean) {
-  return layerQuery<SocialFeedsResponse>('social_feeds', fetchSocialFeeds, enabled, 60_000)
+export function useSocialFeeds(_enabled: boolean) {
+  // Always fetch social feeds — shown in the bottom ticker regardless of layer toggle
+  return useQuery<SocialFeedsResponse>({
+    queryKey: ['social_feeds'],
+    queryFn: fetchSocialFeeds,
+    enabled: true,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: 1,
+  })
 }
 
 export function useNewsIntel(enabled: boolean) {
