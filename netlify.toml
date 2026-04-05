@@ -1,12 +1,16 @@
-# ─── OSINT Protest Map — Netlify configuration ────────────────────────────────
+# ─── OSINT Intelligence Platform — Netlify configuration ──────────────────────
 #
-# ZERO BACKEND REQUIRED for demo/preview mode.
-# VITE_USE_DEMO=true (set below) loads all data from bundled TypeScript —
-# no Render, no Railway, no server of any kind.
+# BACKEND: Deploy the /backend folder to Render.com as a Python web service.
+#          See render.yaml for Render config.
 #
-# To connect a live backend later, add:
-#   VITE_API_BASE_URL = https://<your-backend>.onrender.com/api
-#   VITE_USE_DEMO     = false
+# CONNECTING FRONTEND TO BACKEND:
+#   Option A (recommended — no env var needed):
+#     Update the [[redirects]] proxy rule below with your Render URL.
+#     The line to edit is marked with: ← UPDATE THIS
+#
+#   Option B (Netlify dashboard):
+#     Set VITE_API_BASE_URL = https://<your-service>.onrender.com
+#     in Netlify → Site configuration → Environment variables, then redeploy.
 #
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -16,11 +20,19 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION   = "20"
-  # Demo mode: loads bundled data, no backend server needed
-  VITE_USE_DEMO  = "true"
+  NODE_VERSION  = "20"
+  VITE_USE_DEMO = "false"
 
-# ── SPA fallback ──────────────────────────────────────────────────────────────
+# ── API proxy — forwards /api/* to the Render backend ─────────────────────────
+# This avoids CORS issues and means the frontend never needs VITE_API_BASE_URL.
+# Replace the 'to' URL with your actual Render service URL.
+[[redirects]]
+  from   = "/api/*"
+  to     = "https://osint-protest-map-api.onrender.com/api/:splat"  # ← UPDATE THIS
+  status = 200
+  force  = true
+
+# ── SPA fallback (must come AFTER the API proxy rule) ─────────────────────────
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

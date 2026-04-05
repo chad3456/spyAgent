@@ -170,8 +170,8 @@ const App: React.FC = () => {
   const { data: satData, isLoading: satLoading } = useSatellites(activeLayers.has('satellites'))
   const { data: healthData, isLoading: healthLoading } = useHealth(activeLayers.has('health'))
   const { data: dcData, isLoading: dcLoading } = useDatacenters(activeLayers.has('datacenters'))
-  const { data: socialData } = useSocialFeeds(true)  // always fetch
-  const { data: newsData } = useNewsIntel(activeLayers.has('news_intel'))
+  const { data: socialData, isLoading: socialLoading } = useSocialFeeds(true)  // always fetch
+  const { data: newsData, isLoading: newsLoading } = useNewsIntel(activeLayers.has('news_intel'))
 
   const loadingLayers = useMemo(() => {
     const s = new Set<LayerKey>()
