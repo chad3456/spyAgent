@@ -40,6 +40,9 @@ IDX_GEO_ALTITUDE  = 13
 IDX_SQUAWK        = 14
 
 MAX_AIRCRAFT = 500
+# Each ADS-B source gets at most this long; keep well under the frontend 35 s timeout.
+# All 3 sources run concurrently so total worst-case is SOURCE_TIMEOUT, not 3×.
+SOURCE_TIMEOUT = 12.0
 
 
 def _make_record(icao24, callsign, country, lat, lon, altitude, velocity, heading, vrate, squawk):
@@ -196,11 +199,13 @@ class FlightAgent(BaseAgent):
         if cached is not None:
             return cached
 
-        # Try all three sources concurrently; use first that returns data
+        # Try all three sources concurrently; use first that returns data.
+        # Cap each at SOURCE_TIMEOUT so the total worst-case is ~12 s, not 30 s.
+        per_source = min(SOURCE_TIMEOUT, self.timeout)
         opensky_task, adsblol_task, aplive_task = await asyncio.gather(
-            _fetch_opensky(self.timeout),
-            _fetch_adsblol(self.timeout),
-            _fetch_airplaneslive(self.timeout),
+            _fetch_opensky(per_source),
+            _fetch_adsblol(per_source),
+            _fetch_airplaneslive(per_source),
             return_exceptions=True,
         )
 

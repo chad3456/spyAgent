@@ -162,7 +162,7 @@ const App: React.FC = () => {
   const totalEvents = protests.length + hapiEvents.length
 
   // ─── OSINT layer data — fetched once, passed to both 2D and 3D ────────────
-  const { data: flightsData, isLoading: flightsLoading } = useFlights(activeLayers.has('flights'))
+  const { data: flightsData, isLoading: flightsLoading, isError: flightsError } = useFlights(activeLayers.has('flights'))
   const { data: milData, isLoading: milLoading } = useMilitaryFlights(activeLayers.has('military_flights'))
   const { data: vesselData, isLoading: vesselLoading } = useVessels(activeLayers.has('vessels'))
   const { data: eqData, isLoading: eqLoading } = useEarthquakes(activeLayers.has('earthquakes'))
@@ -170,8 +170,8 @@ const App: React.FC = () => {
   const { data: satData, isLoading: satLoading } = useSatellites(activeLayers.has('satellites'))
   const { data: healthData, isLoading: healthLoading } = useHealth(activeLayers.has('health'))
   const { data: dcData, isLoading: dcLoading } = useDatacenters(activeLayers.has('datacenters'))
-  const { data: socialData, isLoading: socialLoading } = useSocialFeeds(true)  // always fetch
-  const { data: newsData, isLoading: newsLoading } = useNewsIntel(activeLayers.has('news_intel'))
+  const { data: socialData } = useSocialFeeds(true)  // always fetch
+  const { data: newsData } = useNewsIntel(activeLayers.has('news_intel'))
 
   const loadingLayers = useMemo(() => {
     const s = new Set<LayerKey>()
@@ -194,17 +194,23 @@ const App: React.FC = () => {
   ], [dcData])
 
   // OSINT data bundle passed to 2D map
-  const osintLayerData = useMemo<OSINTLayerData>(() => ({
-    flights: flightsData?.aircraft ?? [],
-    militaryFlights: milData?.aircraft ?? [],
-    vessels: vesselData?.vessels ?? [],
-    earthquakes: eqData?.events ?? [],
-    ddos: ddosData?.countries ?? [],
-    satellites: satData?.satellites ?? [],
-    healthOutbreaks: healthData?.outbreaks ?? [],
-    datacenters: allDatacenters,
-    activeLayers,
-  }), [flightsData, milData, vesselData, eqData, ddosData, satData, healthData, allDatacenters, activeLayers])
+  const osintLayerData = useMemo<OSINTLayerData>(() => {
+    const errorLayers = new Set<LayerKey>()
+    if (flightsError && activeLayers.has('flights')) errorLayers.add('flights')
+    return {
+      flights: flightsData?.aircraft ?? [],
+      militaryFlights: milData?.aircraft ?? [],
+      vessels: vesselData?.vessels ?? [],
+      earthquakes: eqData?.events ?? [],
+      ddos: ddosData?.countries ?? [],
+      satellites: satData?.satellites ?? [],
+      healthOutbreaks: healthData?.outbreaks ?? [],
+      datacenters: allDatacenters,
+      activeLayers,
+      loadingLayers,
+      errorLayers,
+    }
+  }, [flightsData, flightsError, milData, vesselData, eqData, ddosData, satData, healthData, allDatacenters, activeLayers, loadingLayers])
 
   const handleSelectEvent = useCallback((e: AnyEvent) => {
     setSelectedEvent(e)
