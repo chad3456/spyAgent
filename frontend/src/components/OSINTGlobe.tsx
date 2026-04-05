@@ -1,119 +1,89 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Globe3D } from './Globe3D'
-import { LayerControl } from './LayerControl'
 import { GlobePointModal } from './GlobePointModal'
 import { NewsIntelPanel } from './NewsIntelPanel'
 import { SocialFeedPanel } from './SocialFeedPanel'
-import {
-  useFlights,
-  useMilitaryFlights,
-  useVessels,
-  useEarthquakes,
-  useDDoS,
-  useSatellites,
-  useHealth,
-  useDatacenters,
-  useSocialFeeds,
-  useNewsIntel,
-} from '../hooks/useOSINTLayers'
 import type { GlobePoint, LayerKey } from '../types/osint'
+import type {
+  Aircraft,
+  MilitaryAircraft,
+  Vessel,
+  Earthquake,
+  DDoSCountry,
+  Satellite,
+  HealthOutbreak,
+  DatacenterFacility,
+  SocialFeedsResponse,
+  NewsIntelResponse,
+} from '../types/osint'
 import type { ProtestEvent, HAPIEvent } from '../types/protest'
 import { Newspaper, Radio, X } from 'lucide-react'
 import clsx from 'clsx'
 
 interface OSINTGlobeProps {
+  // Conflict data (always loaded)
   protests: ProtestEvent[]
   hapiEvents: HAPIEvent[]
+  // Active layer set (owned by App)
+  activeLayers: Set<LayerKey>
+  loadingLayers: Set<LayerKey>
+  // Per-layer data (passed from App)
+  flights: Aircraft[]
+  militaryFlights: MilitaryAircraft[]
+  vessels: Vessel[]
+  earthquakes: Earthquake[]
+  ddos: DDoSCountry[]
+  satellites: Satellite[]
+  healthOutbreaks: HealthOutbreak[]
+  datacenters: DatacenterFacility[]
+  // Side panel data
+  socialData: SocialFeedsResponse | null
+  newsData: NewsIntelResponse | null
+  socialLoading: boolean
+  newsLoading: boolean
 }
 
 type SidePanel = 'news' | 'social' | null
 
-export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({ protests, hapiEvents }) => {
-  const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(
-    new Set<LayerKey>(['conflicts'])
-  )
+export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({
+  protests,
+  hapiEvents,
+  activeLayers,
+  flights,
+  militaryFlights,
+  vessels,
+  earthquakes,
+  ddos,
+  satellites,
+  healthOutbreaks,
+  datacenters,
+  socialData,
+  newsData,
+  socialLoading,
+  newsLoading,
+}) => {
   const [selectedPoint, setSelectedPoint] = useState<GlobePoint | null>(null)
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
 
-  // Layer toggle
-  const handleToggleLayer = useCallback((key: LayerKey) => {
-    setActiveLayers((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      return next
-    })
-  }, [])
-
-  // Fetch each layer only when enabled
-  const { data: flightsData, isLoading: flightsLoading } = useFlights(activeLayers.has('flights'))
-  const { data: milData, isLoading: milLoading } = useMilitaryFlights(activeLayers.has('military_flights'))
-  const { data: vesselData, isLoading: vesselLoading } = useVessels(activeLayers.has('vessels'))
-  const { data: eqData, isLoading: eqLoading } = useEarthquakes(activeLayers.has('earthquakes'))
-  const { data: ddosData, isLoading: ddosLoading } = useDDoS(activeLayers.has('ddos'))
-  const { data: satData, isLoading: satLoading } = useSatellites(activeLayers.has('satellites'))
-  const { data: healthData, isLoading: healthLoading } = useHealth(activeLayers.has('health'))
-  const { data: dcData, isLoading: dcLoading } = useDatacenters(activeLayers.has('datacenters'))
-  const { data: socialData, isLoading: socialLoading } = useSocialFeeds(activeLayers.has('social_feeds'))
-  const { data: newsData, isLoading: newsLoading } = useNewsIntel(activeLayers.has('news_intel'))
-
-  const loadingLayers = useMemo(() => {
-    const loading = new Set<LayerKey>()
-    if (flightsLoading && activeLayers.has('flights')) loading.add('flights')
-    if (milLoading && activeLayers.has('military_flights')) loading.add('military_flights')
-    if (vesselLoading && activeLayers.has('vessels')) loading.add('vessels')
-    if (eqLoading && activeLayers.has('earthquakes')) loading.add('earthquakes')
-    if (ddosLoading && activeLayers.has('ddos')) loading.add('ddos')
-    if (satLoading && activeLayers.has('satellites')) loading.add('satellites')
-    if (healthLoading && activeLayers.has('health')) loading.add('health')
-    if (dcLoading && activeLayers.has('datacenters')) loading.add('datacenters')
-    if (socialLoading && activeLayers.has('social_feeds')) loading.add('social_feeds')
-    if (newsLoading && activeLayers.has('news_intel')) loading.add('news_intel')
-    return loading
-  }, [
-    flightsLoading, milLoading, vesselLoading, eqLoading, ddosLoading,
-    satLoading, healthLoading, dcLoading, socialLoading, newsLoading, activeLayers
-  ])
-
-  // Combine datacenters for globe
-  const allDatacenters = useMemo(() => {
-    if (!dcData) return []
-    return [
-      ...(dcData.datacenters ?? []),
-      ...(dcData.cloudRegions ?? []),
-      ...(dcData.internetExchanges ?? []),
-    ]
-  }, [dcData])
+  const allDatacenters = useMemo(() => datacenters, [datacenters])
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#020810]">
       {/* Globe */}
       <Globe3D
-        flights={flightsData?.aircraft ?? []}
-        militaryFlights={milData?.aircraft ?? []}
-        vessels={vesselData?.vessels ?? []}
-        earthquakes={eqData?.earthquakes ?? []}
-        ddos={ddosData?.countries ?? []}
-        satellites={satData?.satellites ?? []}
+        flights={flights}
+        militaryFlights={militaryFlights}
+        vessels={vessels}
+        earthquakes={earthquakes}
+        ddos={ddos}
+        satellites={satellites}
         protests={protests}
         hapiEvents={hapiEvents}
-        healthOutbreaks={healthData?.outbreaks ?? []}
+        healthOutbreaks={healthOutbreaks}
         datacenters={allDatacenters}
         activeLayers={activeLayers}
         onPointClick={setSelectedPoint}
       />
-
-      {/* Layer control - top right */}
-      <div className="absolute top-4 right-4 z-30">
-        <LayerControl
-          activeLayers={activeLayers}
-          onToggleLayer={handleToggleLayer}
-          loadingLayers={loadingLayers}
-        />
-      </div>
 
       {/* Quick-access side panel buttons - bottom right */}
       <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2">
@@ -123,7 +93,7 @@ export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({ protests, hapiEvents }) 
             'flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all shadow-lg',
             sidePanel === 'news'
               ? 'bg-[#ffd60a]/20 border-[#ffd60a] text-[#ffd60a]'
-              : 'bg-[#0d1b2e]/90 border-[#1e3a5f] text-[#8ba3c0] hover:text-[#e8f0fe] hover:border-[#ffd60a]/50'
+              : 'bg-[#0d1b2e]/90 border-[#1e3a5f] text-[#8ba3c0] hover:text-[#e8f0fe]'
           )}
         >
           <Newspaper className="w-3.5 h-3.5" />
@@ -140,7 +110,7 @@ export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({ protests, hapiEvents }) 
             'flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all shadow-lg',
             sidePanel === 'social'
               ? 'bg-[#5ac8fa]/20 border-[#5ac8fa] text-[#5ac8fa]'
-              : 'bg-[#0d1b2e]/90 border-[#1e3a5f] text-[#8ba3c0] hover:text-[#e8f0fe] hover:border-[#5ac8fa]/50'
+              : 'bg-[#0d1b2e]/90 border-[#1e3a5f] text-[#8ba3c0] hover:text-[#e8f0fe]'
           )}
         >
           <Radio className="w-3.5 h-3.5" />
@@ -154,7 +124,7 @@ export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({ protests, hapiEvents }) 
       </div>
 
       {/* News panel */}
-      {sidePanel === 'news' && newsData && (
+      {sidePanel === 'news' && (
         <div className="absolute bottom-0 right-0 top-0 z-30 w-80 xl:w-96">
           <div className="h-full bg-[#0d1b2e]/98 border-l border-[#1e3a5f] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e3a5f]">
@@ -174,7 +144,7 @@ export const OSINTGlobe: React.FC<OSINTGlobeProps> = ({ protests, hapiEvents }) 
       )}
 
       {/* Social feeds panel */}
-      {sidePanel === 'social' && socialData && (
+      {sidePanel === 'social' && (
         <div className="absolute bottom-0 right-0 top-0 z-30 w-80 xl:w-96">
           <div className="h-full bg-[#0d1b2e]/98 border-l border-[#1e3a5f] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e3a5f]">

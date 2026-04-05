@@ -282,71 +282,77 @@ export interface NewsArticle {
 
 // ─── API Response types ───────────────────────────────────────────────────────
 
+// Response types exactly match backend agent return keys
+
 export interface FlightsResponse {
   aircraft: Aircraft[]
-  totalCount: number
-  lastUpdated: string
+  total?: number
+  fetchedAt?: string
 }
 
 export interface MilitaryFlightsResponse {
   aircraft: MilitaryAircraft[]
-  totalCount: number
-  lastUpdated: string
+  total?: number
+  fetchedAt?: string
 }
 
 export interface VesselsResponse {
   vessels: Vessel[]
-  totalCount: number
-  lastUpdated: string
+  total?: number
+  fetchedAt?: string
 }
 
 export interface EarthquakesResponse {
-  earthquakes: Earthquake[]
-  totalCount: number
-  summary: { CRITICAL: number; HIGH: number; MEDIUM: number; LOW: number }
-  lastUpdated: string
+  // Backend returns "events", not "earthquakes"
+  events: Earthquake[]
+  total?: number
+  summary?: { critical: number; high: number; tsunamiAlerts: number }
+  fetchedAt?: string
 }
 
 export interface DDoSResponse {
   countries: DDoSCountry[]
-  totalAttacks: number
-  topTargets: string[]
-  lastUpdated: string
+  total?: number
+  source?: string
+  hasCFToken?: boolean
+  fetchedAt?: string
 }
 
 export interface SatellitesResponse {
   satellites: Satellite[]
-  totalCount: number
-  categories: Record<string, number>
-  lastUpdated: string
+  total?: number
+  categories?: Record<string, number>
+  fetchedAt?: string
 }
 
 export interface HealthResponse {
   outbreaks: HealthOutbreak[]
-  vaccinationData: VaccinationData[]
-  summary: { totalOutbreaks: number; criticalOutbreaks: number; countries: number }
-  lastUpdated: string
+  vaccinationData?: VaccinationData[]
+  covidData?: unknown[]
+  summary?: { totalOutbreaks: number; criticalOutbreaks: number; countries: number }
+  fetchedAt?: string
 }
 
 export interface DatacentersResponse {
   datacenters: DatacenterFacility[]
   cloudRegions: DatacenterFacility[]
   internetExchanges: DatacenterFacility[]
-  summary: { totalDatacenters: number; totalCloudRegions: number; totalIX: number; countries: number }
-  lastUpdated: string
+  summary?: { totalDatacenters: number; totalCloudRegions: number; totalIX: number; countries: number }
+  fetchedAt?: string
 }
 
 export interface SocialFeedsResponse {
   feeds: SocialFeedItem[]
-  summary: { totalPosts: number; topics: Record<string, number> }
-  lastUpdated: string
+  summary?: { totalPosts: number; topics: Record<string, number> }
+  hasTwitter?: boolean
+  fetchedAt?: string
 }
 
 export interface NewsIntelResponse {
   articles: NewsArticle[]
-  categories: Record<string, NewsArticle[]>
-  summary: { totalArticles: number; sources: string[]; lastUpdated: string }
-  lastUpdated: string
+  categories?: Record<string, NewsArticle[]>
+  summary?: { totalArticles: number; sources: string[]; lastUpdated: string }
+  fetchedAt?: string
 }
 
 // ─── Globe point types ────────────────────────────────────────────────────────
