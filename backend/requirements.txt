@@ -8,3 +8,9 @@ cachetools==5.3.3
 aiohttp==3.9.5
 asyncio==3.4.3
 geopy==2.4.1
+
+# Satellite position propagation (Celestrak TLE + SGP4)
+sgp4==2.23
+
+# Additional data processing
+pytz==2024.1
