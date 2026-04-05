@@ -121,8 +121,9 @@ const App: React.FC = () => {
   const [online, setOnline] = useState(navigator.onLine)
 
   // ─── OSINT layer state — lives here so it persists across 2D / 3D views ───
+  // Default: flights only — shows live air traffic immediately on load
   const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(
-    new Set<LayerKey>(['conflicts'])
+    new Set<LayerKey>(['flights'])
   )
 
   const handleToggleLayer = useCallback((key: LayerKey) => {
@@ -282,13 +283,11 @@ const App: React.FC = () => {
         {/* Map */}
         {viewMode !== 'fulllist' && (
           <div className="relative flex-1 overflow-hidden">
-            {mapLoading && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0a0f1e]/80 pointer-events-none">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-2 border-[#64d2ff] border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[#8ba3c0] text-sm">Aggregating intelligence data…</span>
-                  <span className="text-[#8ba3c0] text-xs">GDELT · HAPI/OCHA · OpenSky · USGS</span>
-                </div>
+            {/* Flight loading overlay — shown while fetching live aircraft */}
+            {flightsLoading && activeLayers.has('flights') && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1050] flex items-center gap-2 px-3 py-1.5 bg-[#0d1b2e]/90 border border-[#64d2ff]/40 rounded-full shadow-lg pointer-events-none">
+                <div className="w-3 h-3 border-2 border-[#64d2ff] border-t-transparent rounded-full animate-spin" />
+                <span className="text-[#64d2ff] text-[11px] font-medium">Fetching live flights…</span>
               </div>
             )}
             <ProtestMap

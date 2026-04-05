@@ -75,7 +75,7 @@ function buildPoints(
           lng: a.lon,
           size: 0.4,
           color: '#64d2ff',
-          label: `✈ ${a.callsign || a.icao24} (${a.country})\nAlt: ${Math.round(a.altitude)}m | ${Math.round(a.velocity)}km/h`,
+          label: `✈ ${a.callsign || a.icao24} (${a.country})\nAlt: ${a.altitude != null ? Math.round(a.altitude) : '?'}m | ${a.velocity != null ? Math.round(a.velocity) : '?'}km/h`,
           data: a,
           layer: 'flights',
         })
@@ -91,7 +91,7 @@ function buildPoints(
           lng: a.lon,
           size: 0.6,
           color: '#ff2d55',
-          label: `🛩 ${a.callsign || a.icao24} [MIL]\n${a.nation || a.country}\nAlt: ${Math.round(a.altitude)}m`,
+          label: `🛩 ${a.callsign || a.icao24} [MIL]\n${a.nation || a.country}\nAlt: ${a.altitude != null ? Math.round(a.altitude) : '?'}m`,
           data: a,
           layer: 'military_flights',
         })
