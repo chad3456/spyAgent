@@ -10,6 +10,12 @@ import type {
   DatacentersResponse,
   SocialFeedsResponse,
   NewsIntelResponse,
+  FiresResponse,
+  InternetOutagesResponse,
+  SubmarinesResponse,
+  DronesResponse,
+  CCTVResponse,
+  SalvoResponse,
 } from '../types/osint'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api'
@@ -66,5 +72,35 @@ export async function fetchSocialFeeds(): Promise<SocialFeedsResponse> {
 
 export async function fetchNewsIntel(): Promise<NewsIntelResponse> {
   const { data } = await api.get<NewsIntelResponse>('/news-intel')
+  return data
+}
+
+export async function fetchFires(): Promise<FiresResponse> {
+  const { data } = await api.get<FiresResponse>('/fires')
+  return data
+}
+
+export async function fetchInternetOutages(): Promise<InternetOutagesResponse> {
+  const { data } = await api.get<InternetOutagesResponse>('/internet-outages')
+  return data
+}
+
+export async function fetchSubmarines(): Promise<SubmarinesResponse> {
+  const { data } = await api.get<SubmarinesResponse>('/submarines')
+  return data
+}
+
+export async function fetchDrones(): Promise<DronesResponse> {
+  const { data } = await api.get<DronesResponse>('/drones')
+  return data
+}
+
+export async function fetchCCTV(): Promise<CCTVResponse> {
+  const { data } = await api.get<CCTVResponse>('/cctv')
+  return data
+}
+
+export async function fetchSalvo(): Promise<SalvoResponse> {
+  const { data } = await api.get<SalvoResponse>('/salvo')
   return data
 }

@@ -12,6 +12,12 @@ export type LayerKey =
   | 'datacenters'
   | 'social_feeds'
   | 'news_intel'
+  | 'fires'
+  | 'internet_outages'
+  | 'submarines'
+  | 'drones'
+  | 'cctv'
+  | 'salvo'
 
 export interface LayerConfig {
   key: LayerKey
@@ -134,6 +140,66 @@ export const LAYER_CONFIGS: LayerConfig[] = [
     enabled: false,
     endpoint: '/news-intel',
     refreshInterval: 300_000,
+  },
+  {
+    key: 'fires',
+    label: 'Wildfires',
+    description: 'NASA FIRMS active fire detections (24 h)',
+    color: '#ff6a00',
+    icon: '🔥',
+    enabled: false,
+    endpoint: '/fires',
+    refreshInterval: 1_800_000,
+  },
+  {
+    key: 'internet_outages',
+    label: 'Internet Outages',
+    description: 'Connectivity disruptions (Cloudflare / NetBlocks)',
+    color: '#5e5ce6',
+    icon: '🌐',
+    enabled: false,
+    endpoint: '/internet-outages',
+    refreshInterval: 600_000,
+  },
+  {
+    key: 'submarines',
+    label: 'Submarine Bases',
+    description: 'Known SSBN / SSN base locations + OSINT deployments',
+    color: '#0a84ff',
+    icon: '🚢',
+    enabled: false,
+    endpoint: '/submarines',
+    refreshInterval: 86_400_000,
+  },
+  {
+    key: 'drones',
+    label: 'Drone Activity',
+    description: 'UAV strikes & incidents (GDELT / War Zone)',
+    color: '#ff453a',
+    icon: '🛸',
+    enabled: false,
+    endpoint: '/drones',
+    refreshInterval: 600_000,
+  },
+  {
+    key: 'cctv',
+    label: 'Public CCTV',
+    description: 'Operator-published webcam catalogue (OSINT)',
+    color: '#32d74b',
+    icon: '📹',
+    enabled: false,
+    endpoint: '/cctv',
+    refreshInterval: 86_400_000,
+  },
+  {
+    key: 'salvo',
+    label: 'Iran/US Salvo',
+    description: 'Missile & drone exchanges, anchors & live events',
+    color: '#ff375f',
+    icon: '🚀',
+    enabled: false,
+    endpoint: '/salvo',
+    refreshInterval: 600_000,
   },
 ]
 
@@ -363,6 +429,173 @@ export interface NewsIntelResponse {
   categories?: Record<string, NewsArticle[]>
   summary?: { totalArticles: number; sources: string[]; lastUpdated: string }
   fetchedAt?: string
+}
+
+// ─── Dhurandhar extended types ────────────────────────────────────────────────
+
+export interface FireDetection {
+  id: string
+  lat: number
+  lon: number
+  brightness: number
+  frp: number
+  confidence: string
+  sensor: string
+  acquired: string
+  dayNight: string
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
+}
+
+export interface FiresResponse {
+  fires: FireDetection[]
+  news: { title: string; url: string; source: string; publishedAt: string }[]
+  summary: { total: number; critical: number; high: number; source: string }
+  source: string
+  fetchedAt: string
+}
+
+export interface OutageEvent {
+  id: string
+  country: string
+  countryCode: string
+  lat: number
+  lon: number
+  title: string
+  url: string
+  source: string
+  reportedAt: string
+  endedAt?: string
+  type: 'active' | 'resolved' | 'report'
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
+}
+
+export interface InternetOutagesResponse {
+  outages: OutageEvent[]
+  summary: { total: number; active: number; countries: number }
+  sources: string[]
+  hasCFToken: boolean
+  fetchedAt: string
+}
+
+export interface SubmarineBase {
+  name: string
+  country: string
+  lat: number
+  lon: number
+  type: 'SSBN' | 'SSN' | 'SSK'
+  fleet: string
+}
+
+export interface SubmarineSighting {
+  id: string
+  title: string
+  url: string
+  source: string
+  publishedAt: string
+}
+
+export interface SubmarinesResponse {
+  bases: SubmarineBase[]
+  sightings: SubmarineSighting[]
+  news: {
+    navalNews: { title: string; url: string; source: string; publishedAt: string }[]
+    usni: { title: string; url: string; source: string; publishedAt: string }[]
+  }
+  summary: { totalBases: number; countries: number; ssbnBases: number; recentSightings: number }
+  disclaimer: string
+  fetchedAt: string
+}
+
+export interface DroneIncident {
+  id: string
+  title: string
+  url: string
+  source: string
+  publishedAt: string
+  lat: number
+  lon: number
+  region: string
+  tag: string
+  severity: 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
+export interface DroneHotspot {
+  name: string
+  lat: number
+  lon: number
+  country: string
+  tag: string
+}
+
+export interface DronesResponse {
+  incidents: DroneIncident[]
+  hotspots: DroneHotspot[]
+  news: {
+    warZone: { title: string; url: string; source: string; publishedAt: string }[]
+    defense: { title: string; url: string; source: string; publishedAt: string }[]
+  }
+  summary: { totalIncidents: number; hotspotCount: number; highSeverity: number }
+  fetchedAt: string
+}
+
+export interface PublicCamera {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  country: string
+  category: 'city' | 'port' | 'airport' | 'border' | 'weather' | 'conflict'
+  operator: string
+  url: string
+}
+
+export interface CCTVResponse {
+  cameras: PublicCamera[]
+  news: { title: string; url: string; source: string; publishedAt: string }[]
+  summary: {
+    total: number
+    byCategory: Record<string, number>
+    byCountry: Record<string, number>
+  }
+  disclaimer: string
+  fetchedAt: string
+}
+
+export interface SalvoEvent {
+  id: string
+  title: string
+  url: string
+  source: string
+  publishedAt: string
+  lat: number
+  lon: number
+  region: string
+  category: string
+  severity: 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
+export interface SalvoAnchor {
+  id: string
+  date: string
+  name: string
+  origin: { name: string; lat: number; lon: number }
+  target: { name: string; lat: number; lon: number }
+  munitions: string
+  actor: string
+  severity: 'CRITICAL' | 'HIGH'
+  intercepted: boolean
+}
+
+export interface SalvoResponse {
+  events: SalvoEvent[]
+  anchors: SalvoAnchor[]
+  news: {
+    warZone: { title: string; url: string; source: string; publishedAt: string }[]
+    usni: { title: string; url: string; source: string; publishedAt: string }[]
+    lwj: { title: string; url: string; source: string; publishedAt: string }[]
+  }
+  summary: { totalEvents: number; anchorEvents: number; criticalAnchors: number }
+  fetchedAt: string
 }
 
 // ─── Globe point types ────────────────────────────────────────────────────────

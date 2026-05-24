@@ -54,6 +54,8 @@ from agents import (
     ProtestAgent, HAPIAgent, StreamAgent,
     FlightAgent, MilitaryFlightAgent, VesselAgent, EarthquakeAgent, DDoSAgent,
     SatelliteAgent, HealthAgent, DatacenterAgent, SocialMediaAgent, NewsIntelAgent,
+    # Dhurandhar extended agents
+    FiresAgent, InternetOutageAgent, SubmarineAgent, DroneAgent, CCTVAgent, SalvoAgent,
 )
 
 # ---------------------------------------------------------------------------
@@ -113,6 +115,14 @@ _health_agent = HealthAgent(timeout=_timeout)
 _datacenter_agent = DatacenterAgent(timeout=_timeout)
 _social_media_agent = SocialMediaAgent(timeout=_timeout)
 _news_intel_agent = NewsIntelAgent(timeout=_timeout)
+
+# Dhurandhar extended agents
+_fires_agent = FiresAgent(timeout=_timeout)
+_internet_outage_agent = InternetOutageAgent(timeout=_timeout)
+_submarine_agent = SubmarineAgent(timeout=_timeout)
+_drone_agent = DroneAgent(timeout=_timeout)
+_cctv_agent = CCTVAgent(timeout=_timeout)
+_salvo_agent = SalvoAgent(timeout=_timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +633,125 @@ async def get_osint_summary():
     except Exception as exc:
         logger.error("OSINT summary error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT summary: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Dhurandhar Extended Intelligence Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/api/fires", tags=["dhurandhar"])
+async def get_fires():
+    """
+    Global active wildfire detections from NASA FIRMS (VIIRS / MODIS, 24h).
+    Falls back to GDELT wildfire news if FIRMS endpoints are unreachable.
+    """
+    try:
+        return await _fires_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Fires agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch fires: {exc}")
+
+
+@app.get("/api/internet-outages", tags=["dhurandhar"])
+async def get_internet_outages():
+    """
+    Internet shutdown / outage reports.
+    Sources: Cloudflare Radar (CF_RADAR_TOKEN), NetBlocks RSS, GDELT.
+    """
+    try:
+        return await _internet_outage_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Internet outage agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch outages: {exc}")
+
+
+@app.get("/api/submarines", tags=["dhurandhar"])
+async def get_submarines():
+    """
+    Known submarine bases (US, Russia, China, India, NATO, Iran, etc.) plus
+    OSINT-derived deployment news. Real-time sub positions are classified
+    and not publicly broadcast.
+    """
+    try:
+        return await _submarine_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Submarine agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch submarine data: {exc}")
+
+
+@app.get("/api/drones", tags=["dhurandhar"])
+async def get_drones():
+    """
+    Drone strike & UAV incident tracking from GDELT + The War Zone + Defense News.
+    """
+    try:
+        return await _drone_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Drone agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch drone data: {exc}")
+
+
+@app.get("/api/cctv", tags=["dhurandhar"])
+async def get_cctv():
+    """
+    Curated catalogue of publicly published webcams (tourism, ports, airports,
+    traffic, conflict-adjacent). Only operator-released feeds are referenced.
+    """
+    try:
+        return await _cctv_agent.fetch_data()
+    except Exception as exc:
+        logger.error("CCTV agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch CCTV catalogue: {exc}")
+
+
+@app.get("/api/salvo", tags=["dhurandhar"])
+async def get_salvo():
+    """
+    Iran / US / proxy conflict salvo tracker — missile and drone exchanges
+    aggregated from GDELT, USNI, Naval News, The War Zone and Long War Journal.
+    Includes well-documented historical salvo anchors with origin/target arcs.
+    """
+    try:
+        return await _salvo_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Salvo agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch salvo data: {exc}")
+
+
+@app.get("/api/dhurandhar-summary", tags=["dhurandhar"])
+async def get_dhurandhar_summary():
+    """
+    Combined Dhurandhar payload: all six extended intelligence layers fetched concurrently.
+    """
+    try:
+        fires, outages, subs, drones, cctv, salvo = await asyncio.gather(
+            _fires_agent.fetch_data(),
+            _internet_outage_agent.fetch_data(),
+            _submarine_agent.fetch_data(),
+            _drone_agent.fetch_data(),
+            _cctv_agent.fetch_data(),
+            _salvo_agent.fetch_data(),
+            return_exceptions=True,
+        )
+
+        def _safe(r, label):
+            if isinstance(r, Exception):
+                logger.error("%s failed: %s", label, r)
+                return {"error": str(r)}
+            return r
+
+        return {
+            "fires":          _safe(fires,   "FiresAgent"),
+            "internetOutages":_safe(outages, "InternetOutageAgent"),
+            "submarines":     _safe(subs,    "SubmarineAgent"),
+            "drones":         _safe(drones,  "DroneAgent"),
+            "cctv":           _safe(cctv,    "CCTVAgent"),
+            "salvo":          _safe(salvo,   "SalvoAgent"),
+            "lastUpdated":    datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.error("Dhurandhar summary error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch dhurandhar summary: {exc}")
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,14 @@ from .datacenter_agent import DatacenterAgent
 from .social_media_agent import SocialMediaAgent
 from .news_intel_agent import NewsIntelAgent
 
+# Dhurandhar branch — extended intelligence agents
+from .fires_agent import FiresAgent
+from .internet_outage_agent import InternetOutageAgent
+from .submarine_agent import SubmarineAgent
+from .drone_agent import DroneAgent
+from .cctv_agent import CCTVAgent
+from .salvo_agent import SalvoAgent
+
 __all__ = [
     # Existing agents
     "EconomicAgent",
@@ -47,4 +55,11 @@ __all__ = [
     "DatacenterAgent",
     "SocialMediaAgent",
     "NewsIntelAgent",
+    # Dhurandhar extended agents
+    "FiresAgent",
+    "InternetOutageAgent",
+    "SubmarineAgent",
+    "DroneAgent",
+    "CCTVAgent",
+    "SalvoAgent",
 ]

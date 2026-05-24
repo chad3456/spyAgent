@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle, Globe2 } from 'lucide-react'
+import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle, Globe2, Rocket } from 'lucide-react'
 import clsx from 'clsx'
 import type { ProtestEvent, HAPIEvent, FilterState } from './types/protest'
 import { DEFAULT_FILTERS } from './types/protest'
@@ -27,6 +27,7 @@ import type { OSINTLayerData } from './components/ProtestMap'
 import { OSINTGlobe } from './components/OSINTGlobe'
 import { LayerControl } from './components/LayerControl'
 import { SocialFeedTicker } from './components/SocialFeedTicker'
+import { DhurandharPanel } from './components/DhurandharPanel'
 
 type AnyEvent = ProtestEvent | HAPIEvent
 type PanelTab = 'events' | 'video'
@@ -44,7 +45,8 @@ const Header: React.FC<{
   onRefresh: () => void
   viewMode: ViewMode
   onViewMode: (v: ViewMode) => void
-}> = ({ online, onRefresh, viewMode, onViewMode }) => (
+  onOpenDhurandhar: () => void
+}> = ({ online, onRefresh, viewMode, onViewMode, onOpenDhurandhar }) => (
   <header className="flex-shrink-0 bg-[#0a0f1e]/95 backdrop-blur-sm border-b border-[#1e3a5f] z-50">
     <div className="flex items-center gap-3 px-4 py-2.5">
       <div className="flex items-center gap-2.5 flex-shrink-0">
@@ -100,6 +102,14 @@ const Header: React.FC<{
           </span>
         </div>
         <button
+          onClick={onOpenDhurandhar}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-red-600/80 to-orange-500/80 hover:from-red-600 hover:to-orange-500 border border-red-500/40 rounded-lg text-white transition-all text-xs font-semibold"
+          title="Open Dhurandhar Intel — salvo, fires, outages, subs, drones, CCTV"
+        >
+          <Rocket className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Dhurandhar</span>
+        </button>
+        <button
           onClick={onRefresh}
           className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1e3a5f]/60 hover:bg-[#1e3a5f] border border-[#1e3a5f] rounded-lg text-[#8ba3c0] hover:text-[#e8f0fe] transition-all text-xs"
         >
@@ -119,6 +129,7 @@ const App: React.FC = () => {
   const [panelTab, setPanelTab] = useState<PanelTab>('events')
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [online, setOnline] = useState(navigator.onLine)
+  const [dhurandharOpen, setDhurandharOpen] = useState(false)
 
   // ─── OSINT layer state — lives here so it persists across 2D / 3D views ───
   // Default: flights only — shows live air traffic immediately on load
@@ -170,8 +181,8 @@ const App: React.FC = () => {
   const { data: satData, isLoading: satLoading } = useSatellites(activeLayers.has('satellites'))
   const { data: healthData, isLoading: healthLoading } = useHealth(activeLayers.has('health'))
   const { data: dcData, isLoading: dcLoading } = useDatacenters(activeLayers.has('datacenters'))
-  const { data: socialData } = useSocialFeeds(true)  // always fetch
-  const { data: newsData } = useNewsIntel(activeLayers.has('news_intel'))
+  const { data: socialData, isLoading: socialLoading } = useSocialFeeds(true)  // always fetch
+  const { data: newsData, isLoading: newsLoading } = useNewsIntel(activeLayers.has('news_intel'))
 
   const loadingLayers = useMemo(() => {
     const s = new Set<LayerKey>()
@@ -232,7 +243,7 @@ const App: React.FC = () => {
   if (viewMode === 'globe3d') {
     return (
       <div className="flex flex-col h-screen bg-[#020810] text-[#e8f0fe] overflow-hidden">
-        <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} />
+        <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} />
         <div className="flex-1 overflow-hidden relative">
           <OSINTGlobe
             protests={protests}
@@ -263,6 +274,7 @@ const App: React.FC = () => {
         </div>
         {/* Social feed ticker always at bottom */}
         <SocialFeedTicker data={socialData} loading={socialLoading} />
+        <DhurandharPanel open={dhurandharOpen} onClose={() => setDhurandharOpen(false)} />
       </div>
     )
   }
@@ -270,7 +282,7 @@ const App: React.FC = () => {
   // ─── 2D / Split / List views ──────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-[#0a0f1e] text-[#e8f0fe] overflow-hidden">
-      <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} />
+      <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} />
 
       {/* Stats + Filter bar */}
       <div className="flex-shrink-0 border-b border-[#1e3a5f] bg-[#0a0f1e]/90 px-4 py-2 space-y-2">
@@ -393,6 +405,9 @@ const App: React.FC = () => {
 
       {/* Event modal */}
       {modalEvent && <EventModal event={modalEvent} onClose={() => setModalEvent(null)} />}
+
+      {/* Dhurandhar extended intel drawer */}
+      <DhurandharPanel open={dhurandharOpen} onClose={() => setDhurandharOpen(false)} />
     </div>
   )
 }
