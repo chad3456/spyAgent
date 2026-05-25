@@ -58,6 +58,13 @@ from agents import (
     FiresAgent, InternetOutageAgent, SubmarineAgent, DroneAgent, CCTVAgent, SalvoAgent,
 )
 
+# Claude analyst team — synthesises the raw swarm output into intelligence products.
+from agents.claude import (
+    TeamCoordinator, ThreatAnalyst, CorrelationAgent, BriefingAgent,
+    RegionalAnalyst, claude_available,
+)
+from agents.claude.regional_analyst import COUNTRY_PROFILES
+
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
@@ -123,6 +130,9 @@ _submarine_agent = SubmarineAgent(timeout=_timeout)
 _drone_agent = DroneAgent(timeout=_timeout)
 _cctv_agent = CCTVAgent(timeout=_timeout)
 _salvo_agent = SalvoAgent(timeout=_timeout)
+
+# Claude analyst team — built once, reused across requests.
+_claude_team = TeamCoordinator()
 
 
 # ---------------------------------------------------------------------------
@@ -752,6 +762,126 @@ async def get_dhurandhar_summary():
     except Exception as exc:
         logger.error("Dhurandhar summary error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch dhurandhar summary: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Claude Analyst Team Routes
+# ---------------------------------------------------------------------------
+
+async def _gather_intel_payload() -> dict:
+    """
+    Aggregate the OSINT swarm output into a single payload the Claude analyst
+    team can reason over. Runs the agents concurrently and tolerates per-agent
+    failures so a single broken feed doesn't blank the brief.
+    """
+    results = await asyncio.gather(
+        _flight_agent.fetch_data(),
+        _military_flight_agent.fetch_data(),
+        _vessel_agent.fetch_data(),
+        _earthquake_agent.fetch_data(),
+        _satellite_agent.fetch_data(),
+        _health_agent.fetch_data(),
+        _datacenter_agent.fetch_data(),
+        _fires_agent.fetch_data(),
+        _internet_outage_agent.fetch_data(),
+        _submarine_agent.fetch_data(),
+        _drone_agent.fetch_data(),
+        _cctv_agent.fetch_data(),
+        _salvo_agent.fetch_data(),
+        _protest_agent.fetch_data(),
+        _hapi_agent.fetch_data(),
+        _news_intel_agent.fetch_data(),
+        return_exceptions=True,
+    )
+    labels = [
+        "flights", "militaryFlights", "vessels", "earthquakes", "satellites",
+        "health", "datacenters", "fires", "internetOutages", "submarines",
+        "drones", "cctv", "salvo", "protests", "hapiEvents", "newsIntel",
+    ]
+
+    def _safe(r, label):
+        if isinstance(r, Exception):
+            logger.warning("intel payload — %s failed: %s", label, r)
+            return {"error": str(r)}
+        return r
+
+    return {label: _safe(r, label) for label, r in zip(labels, results)}
+
+
+@app.get("/api/intel/status", tags=["claude-team"])
+async def get_intel_status():
+    """Is the Claude analyst team available? Surfaces whether the API key is set."""
+    return {
+        "claudeAvailable": claude_available(),
+        "countries": list(_claude_team.regional_analysts.keys()),
+        "analysts": [
+            "threat_analyst", "correlation_agent", "briefing_agent",
+            *[f"regional_analyst:{cc}" for cc in _claude_team.regional_analysts],
+        ],
+        "briefingModel": _claude_team.briefing_agent.model,
+        "analystModel": _claude_team.threat_analyst.model,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/intel/team-brief", tags=["claude-team"])
+async def get_team_brief():
+    """
+    The full Claude analyst team product: top-line briefing, threats,
+    correlations, and per-country regional briefs — all derived from the live
+    OSINT swarm payload.
+    """
+    try:
+        raw = await _gather_intel_payload()
+        return await _claude_team.run(raw)
+    except Exception as exc:
+        logger.error("Team brief failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Team brief failed: {exc}")
+
+
+@app.get("/api/intel/threats", tags=["claude-team"])
+async def get_intel_threats():
+    """ThreatAnalyst output only — ranked threats list."""
+    try:
+        raw = await _gather_intel_payload()
+        return await _claude_team.threat_analyst.analyse(raw)
+    except Exception as exc:
+        logger.error("Threat analyst failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Threat analyst failed: {exc}")
+
+
+@app.get("/api/intel/correlations", tags=["claude-team"])
+async def get_intel_correlations():
+    """CorrelationAgent output only — cross-feed pattern matches."""
+    try:
+        raw = await _gather_intel_payload()
+        return await _claude_team.correlation_agent.analyse(raw)
+    except Exception as exc:
+        logger.error("Correlation agent failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Correlation agent failed: {exc}")
+
+
+@app.get("/api/intel/regional/{country_code}", tags=["claude-team"])
+async def get_intel_regional(country_code: str):
+    """
+    RegionalAnalyst output for a single country. Supported codes:
+    US, RU, CN, IN, IR.
+    """
+    cc = country_code.upper()
+    if cc not in COUNTRY_PROFILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported country code: {country_code}. Use one of: {', '.join(COUNTRY_PROFILES)}",
+        )
+    analyst = _claude_team.regional_analysts.get(cc)
+    if analyst is None:
+        raise HTTPException(status_code=500, detail=f"No analyst configured for {cc}")
+    try:
+        raw = await _gather_intel_payload()
+        return await analyst.analyse(raw)
+    except Exception as exc:
+        logger.error("Regional analyst %s failed: %s", cc, exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Regional analyst failed: {exc}")
 
 
 # ---------------------------------------------------------------------------

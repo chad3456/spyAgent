@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle, Globe2, Rocket } from 'lucide-react'
+import { RefreshCw, Wifi, WifiOff, Globe, Map, Video, List, AlertTriangle, Globe2, Rocket, Brain } from 'lucide-react'
 import clsx from 'clsx'
 import type { ProtestEvent, HAPIEvent, FilterState } from './types/protest'
 import { DEFAULT_FILTERS } from './types/protest'
@@ -28,6 +28,7 @@ import { OSINTGlobe } from './components/OSINTGlobe'
 import { LayerControl } from './components/LayerControl'
 import { SocialFeedTicker } from './components/SocialFeedTicker'
 import { DhurandharPanel } from './components/DhurandharPanel'
+import { IntelBriefPanel } from './components/IntelBriefPanel'
 
 type AnyEvent = ProtestEvent | HAPIEvent
 type PanelTab = 'events' | 'video'
@@ -46,7 +47,8 @@ const Header: React.FC<{
   viewMode: ViewMode
   onViewMode: (v: ViewMode) => void
   onOpenDhurandhar: () => void
-}> = ({ online, onRefresh, viewMode, onViewMode, onOpenDhurandhar }) => (
+  onOpenIntel: () => void
+}> = ({ online, onRefresh, viewMode, onViewMode, onOpenDhurandhar, onOpenIntel }) => (
   <header className="flex-shrink-0 bg-[#0a0f1e]/95 backdrop-blur-sm border-b border-[#1e3a5f] z-50">
     <div className="flex items-center gap-3 px-4 py-2.5">
       <div className="flex items-center gap-2.5 flex-shrink-0">
@@ -102,6 +104,14 @@ const Header: React.FC<{
           </span>
         </div>
         <button
+          onClick={onOpenIntel}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-violet-600/80 to-blue-500/80 hover:from-violet-600 hover:to-blue-500 border border-violet-500/40 rounded-lg text-white transition-all text-xs font-semibold"
+          title="Open Claude analyst team — multi-agent OSINT synthesis"
+        >
+          <Brain className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Intel Brief</span>
+        </button>
+        <button
           onClick={onOpenDhurandhar}
           className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-red-600/80 to-orange-500/80 hover:from-red-600 hover:to-orange-500 border border-red-500/40 rounded-lg text-white transition-all text-xs font-semibold"
           title="Open Dhurandhar Intel — salvo, fires, outages, subs, drones, CCTV"
@@ -130,6 +140,7 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [online, setOnline] = useState(navigator.onLine)
   const [dhurandharOpen, setDhurandharOpen] = useState(false)
+  const [intelOpen, setIntelOpen] = useState(false)
 
   // ─── OSINT layer state — lives here so it persists across 2D / 3D views ───
   // Default: flights only — shows live air traffic immediately on load
@@ -243,7 +254,7 @@ const App: React.FC = () => {
   if (viewMode === 'globe3d') {
     return (
       <div className="flex flex-col h-screen bg-[#020810] text-[#e8f0fe] overflow-hidden">
-        <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} />
+        <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} onOpenIntel={() => setIntelOpen(true)} />
         <div className="flex-1 overflow-hidden relative">
           <OSINTGlobe
             protests={protests}
@@ -275,6 +286,7 @@ const App: React.FC = () => {
         {/* Social feed ticker always at bottom */}
         <SocialFeedTicker data={socialData} loading={socialLoading} />
         <DhurandharPanel open={dhurandharOpen} onClose={() => setDhurandharOpen(false)} />
+        <IntelBriefPanel open={intelOpen} onClose={() => setIntelOpen(false)} />
       </div>
     )
   }
@@ -282,7 +294,7 @@ const App: React.FC = () => {
   // ─── 2D / Split / List views ──────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-[#0a0f1e] text-[#e8f0fe] overflow-hidden">
-      <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} />
+      <Header online={online} onRefresh={() => refetch()} viewMode={viewMode} onViewMode={setViewMode} onOpenDhurandhar={() => setDhurandharOpen(true)} onOpenIntel={() => setIntelOpen(true)} />
 
       {/* Stats + Filter bar */}
       <div className="flex-shrink-0 border-b border-[#1e3a5f] bg-[#0a0f1e]/90 px-4 py-2 space-y-2">
@@ -408,6 +420,9 @@ const App: React.FC = () => {
 
       {/* Dhurandhar extended intel drawer */}
       <DhurandharPanel open={dhurandharOpen} onClose={() => setDhurandharOpen(false)} />
+
+      {/* Claude analyst team intel brief drawer */}
+      <IntelBriefPanel open={intelOpen} onClose={() => setIntelOpen(false)} />
     </div>
   )
 }
