@@ -17,9 +17,10 @@ export function useTeamBrief(enabled: boolean) {
     queryKey: ['team_brief'],
     queryFn: fetchTeamBrief,
     enabled,
-    // Backend caches per analyst for 5 min; refresh the dashboard view every 5 min too.
-    staleTime: 5 * 60_000,
-    refetchInterval: enabled ? 5 * 60_000 : false,
+    // Underlying OSINT feeds update at ~1-5 min cadence; refresh every 2 min.
+    // The local heuristic team runs in 1-3 s; the Claude team caches 5 min server-side.
+    staleTime: 120_000,
+    refetchInterval: enabled ? 120_000 : false,
     retry: 0,
   })
 }

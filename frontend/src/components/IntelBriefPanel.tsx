@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Brain, Sparkles, AlertTriangle, GitMerge, Flag, Eye } from 'lucide-react'
+import { X, Brain, Sparkles, AlertTriangle, GitMerge, Flag, Eye, Cpu, Server } from 'lucide-react'
 import clsx from 'clsx'
 import { useIntelStatus, useTeamBrief } from '../hooks/useIntel'
 import type {
@@ -55,8 +55,10 @@ export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose 
     | Record<string, AnalystEnvelope<RegionalAnalysis>>
     | undefined
 
-  const isDisabled = brief.data?.disabled || status.data?.claudeAvailable === false
   const isLoading = brief.isLoading || (brief.isFetching && !brief.data)
+  const activeEngine = (brief.data?.engine ?? status.data?.activeEngine ?? 'local') as string
+  const isClaude = activeEngine === 'claude'
+  const ollamaActive = brief.data?.ollamaActive ?? status.data?.ollamaAvailable ?? false
 
   return (
     <div className="fixed inset-0 z-[2000] flex justify-end">
@@ -65,17 +67,39 @@ export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose 
       <div className="relative w-full max-w-3xl h-full bg-[#0a0f1e] border-l border-[#1e3a5f] shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1e3a5f] bg-gradient-to-r from-[#1e3a5f]/60 to-transparent">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-blue-500 flex items-center justify-center">
-            <Brain className="w-4 h-4 text-white" />
+          <div
+            className={clsx(
+              'w-8 h-8 rounded-lg flex items-center justify-center',
+              isClaude
+                ? 'bg-gradient-to-br from-violet-600 to-blue-500'
+                : 'bg-gradient-to-br from-emerald-600 to-cyan-500',
+            )}
+          >
+            {isClaude ? <Brain className="w-4 h-4 text-white" /> : <Cpu className="w-4 h-4 text-white" />}
           </div>
           <div className="flex-1">
             <h2 className="text-[#e8f0fe] font-bold text-sm leading-tight flex items-center gap-2">
-              Claude Analyst Team
-              <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+              {isClaude ? 'Claude Analyst Team' : 'Local Analyst Team'}
+              <Sparkles className={clsx('w-3.5 h-3.5', isClaude ? 'text-violet-300' : 'text-emerald-300')} />
             </h2>
-            <p className="text-[#8ba3c0] text-[10px] leading-tight">
-              {status.data?.briefingModel ?? 'claude-opus-4-7'} + {status.data?.analystModel ?? 'claude-haiku-4-5'} ·{' '}
-              {status.data?.analysts.length ?? 8} analysts in parallel
+            <p className="text-[#8ba3c0] text-[10px] leading-tight flex items-center gap-1.5 flex-wrap">
+              <EngineBadge isClaude={isClaude} />
+              <span>·</span>
+              <span>
+                {status.data?.briefingModel ?? (isClaude ? 'claude-opus-4-7' : 'local-heuristic-v1')}
+                {' + '}
+                {status.data?.analystModel ?? (isClaude ? 'claude-haiku-4-5' : 'local-heuristic-v1')}
+              </span>
+              <span>·</span>
+              <span>{status.data?.analysts.length ?? 8} analysts</span>
+              {ollamaActive && (
+                <>
+                  <span>·</span>
+                  <span className="flex items-center gap-0.5 text-emerald-300">
+                    <Server className="w-2.5 h-2.5" /> Ollama polish on
+                  </span>
+                </>
+              )}
             </p>
           </div>
           <button
@@ -88,22 +112,32 @@ export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose 
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
-          {isDisabled && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-3 text-[12px] text-amber-200">
-              <strong className="text-amber-300">Claude analyst team offline.</strong>{' '}
-              {brief.data?.reason ??
-                'Set ANTHROPIC_API_KEY in the backend environment to enable real-time intelligence synthesis from the OSINT swarm.'}
+          {!isClaude && (
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-md p-2.5 text-[11px] text-cyan-200/90">
+              <strong className="text-cyan-300">Local heuristic engine active.</strong>{' '}
+              No API key required — rule-based synthesis runs against the live OSINT swarm.
+              {' '}
+              {ollamaActive
+                ? 'Bottom-line prose is being polished by your local Ollama model.'
+                : 'Set ANTHROPIC_API_KEY for Claude-driven synthesis, or run Ollama on localhost:11434 to polish the prose locally.'}
             </div>
           )}
 
-          {!isDisabled && isLoading && (
+          {isLoading && (
             <div className="flex items-center gap-2 text-[#8ba3c0] text-[12px]">
-              <div className="w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-              Running 8-analyst team against live OSINT swarm output… (15-45s, single Opus brief + 7 Haiku analysts in parallel)
+              <div
+                className={clsx(
+                  'w-3 h-3 border-2 rounded-full animate-spin border-t-transparent',
+                  isClaude ? 'border-violet-400' : 'border-emerald-400',
+                )}
+              />
+              {isClaude
+                ? 'Running 8-analyst team against live OSINT swarm… (15-45 s, Opus brief + Haiku analysts in parallel)'
+                : 'Running 8-analyst heuristic team against live OSINT swarm… (typically 1-3 s)'}
             </div>
           )}
 
-          {!isDisabled && brief.isError && (
+          {brief.isError && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-md p-3 text-[12px] text-red-200">
               <strong className="text-red-300">Team brief failed.</strong>{' '}
               {(brief.error as Error)?.message ?? 'Unknown error'}
@@ -347,6 +381,20 @@ export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose 
     </div>
   )
 }
+
+const EngineBadge: React.FC<{ isClaude: boolean }> = ({ isClaude }) => (
+  <span
+    className={clsx(
+      'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
+      isClaude
+        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
+        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+    )}
+  >
+    {isClaude ? <Brain className="w-2.5 h-2.5" /> : <Cpu className="w-2.5 h-2.5" />}
+    {isClaude ? 'Claude' : 'Local'}
+  </span>
+)
 
 const RegionalList: React.FC<{ title: string; items: string[] }> = ({ title, items }) => (
   <div>

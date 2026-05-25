@@ -97,6 +97,8 @@ export interface TeamBriefResponse {
     totalCacheReadInputTokens: number
     analystCount: number
   }
+  engine?: 'claude' | 'local' | 'local-heuristic' | string
+  ollamaActive?: boolean
   generatedAt: string
   disabled?: boolean
   reason?: string
@@ -104,9 +106,16 @@ export interface TeamBriefResponse {
 
 export interface IntelStatusResponse {
   claudeAvailable: boolean
+  ollamaAvailable: boolean
+  activeEngine: 'claude' | 'local'
   countries: string[]
   analysts: string[]
   briefingModel: string
   analystModel: string
+  engines: {
+    claude: { available: boolean; reason: string | null }
+    local: { available: boolean; reason: string | null }
+    ollama: { available: boolean; reason: string | null }
+  }
   timestamp: string
 }

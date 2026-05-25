@@ -28,6 +28,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,6 +65,11 @@ from agents.claude import (
     RegionalAnalyst, claude_available,
 )
 from agents.claude.regional_analyst import COUNTRY_PROFILES
+
+# Local intel team — rule-based heuristics + optional Ollama polish. Works
+# fully offline with no API key, producing the same response shape as the
+# Claude team so the dashboard panel is engine-agnostic.
+from agents.local_intel import LocalTeamCoordinator, ollama_available
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -133,6 +139,18 @@ _salvo_agent = SalvoAgent(timeout=_timeout)
 
 # Claude analyst team — built once, reused across requests.
 _claude_team = TeamCoordinator()
+
+# Local heuristic intel team — always available, no API key required.
+_local_team = LocalTeamCoordinator()
+
+
+def _active_team():
+    """
+    Pick the analyst team to use. Claude if its key is set; otherwise the
+    local heuristic team. Override with ?engine=local or ?engine=claude on
+    individual routes.
+    """
+    return _claude_team if claude_available() else _local_team
 
 
 # ---------------------------------------------------------------------------
@@ -808,77 +826,130 @@ async def _gather_intel_payload() -> dict:
     return {label: _safe(r, label) for label, r in zip(labels, results)}
 
 
-@app.get("/api/intel/status", tags=["claude-team"])
+def _resolve_team(engine: Optional[str] = None):
+    """Map ?engine= query param → coordinator. Defaults to whatever's available."""
+    if engine == "claude":
+        if not claude_available():
+            raise HTTPException(
+                status_code=400,
+                detail="engine=claude requested but ANTHROPIC_API_KEY is not set.",
+            )
+        return _claude_team, "claude"
+    if engine == "local":
+        return _local_team, "local"
+    if engine is None:
+        team = _active_team()
+        return team, "claude" if team is _claude_team else "local"
+    raise HTTPException(status_code=400, detail=f"unknown engine: {engine}")
+
+
+async def _run_one_analyst(team, attr: str, raw: dict):
+    """
+    Run a single analyst across either team. Claude analysts expose .analyse;
+    local synths expose .synthesise. We normalise here so the routes are
+    engine-agnostic.
+    """
+    analyst = getattr(team, attr)
+    if hasattr(analyst, "analyse"):
+        return await analyst.analyse(raw)
+    # Local synth — synchronous CPU work
+    return analyst.synthesise(raw)
+
+
+@app.get("/api/intel/status", tags=["intel"])
 async def get_intel_status():
-    """Is the Claude analyst team available? Surfaces whether the API key is set."""
+    """Which intel team is currently driving /api/intel/* routes?"""
+    using_claude = claude_available()
+    active = _active_team()
     return {
-        "claudeAvailable": claude_available(),
-        "countries": list(_claude_team.regional_analysts.keys()),
+        "claudeAvailable": using_claude,
+        "ollamaAvailable": ollama_available(),
+        "activeEngine": "claude" if using_claude else "local",
+        "countries": list(active.regional_analysts.keys()),
         "analysts": [
             "threat_analyst", "correlation_agent", "briefing_agent",
-            *[f"regional_analyst:{cc}" for cc in _claude_team.regional_analysts],
+            *[f"regional_analyst:{cc}" for cc in active.regional_analysts],
         ],
-        "briefingModel": _claude_team.briefing_agent.model,
-        "analystModel": _claude_team.threat_analyst.model,
+        "briefingModel": active.briefing_agent.model if hasattr(active.briefing_agent, "model") else "local-heuristic-v1",
+        "analystModel": active.threat_analyst.model if hasattr(active.threat_analyst, "model") else "local-heuristic-v1",
+        "engines": {
+            "claude": {
+                "available": using_claude,
+                "reason": None if using_claude else "ANTHROPIC_API_KEY not set",
+            },
+            "local": {"available": True, "reason": None},
+            "ollama": {
+                "available": ollama_available(),
+                "reason": None if ollama_available() else "Ollama not detected on localhost:11434 (optional)",
+            },
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
-@app.get("/api/intel/team-brief", tags=["claude-team"])
-async def get_team_brief():
+@app.get("/api/intel/team-brief", tags=["intel"])
+async def get_team_brief(engine: Optional[str] = None):
     """
-    The full Claude analyst team product: top-line briefing, threats,
-    correlations, and per-country regional briefs — all derived from the live
-    OSINT swarm payload.
+    Full analyst team product (briefing + threats + correlations + regional).
+    Defaults to Claude if ANTHROPIC_API_KEY is set, otherwise the local
+    heuristic team. Force one with ?engine=claude or ?engine=local.
     """
+    team, engine_label = _resolve_team(engine)
     try:
         raw = await _gather_intel_payload()
-        return await _claude_team.run(raw)
+        result = await team.run(raw)
+        result.setdefault("engine", engine_label)
+        return result
     except Exception as exc:
-        logger.error("Team brief failed: %s", exc, exc_info=True)
+        logger.error("Team brief failed (engine=%s): %s", engine_label, exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Team brief failed: {exc}")
 
 
-@app.get("/api/intel/threats", tags=["claude-team"])
-async def get_intel_threats():
-    """ThreatAnalyst output only — ranked threats list."""
+@app.get("/api/intel/threats", tags=["intel"])
+async def get_intel_threats(engine: Optional[str] = None):
+    """ThreatAnalyst / ThreatSynth output only — ranked threats list."""
+    team, _ = _resolve_team(engine)
     try:
         raw = await _gather_intel_payload()
-        return await _claude_team.threat_analyst.analyse(raw)
+        return await _run_one_analyst(team, "threat_analyst", raw)
     except Exception as exc:
         logger.error("Threat analyst failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Threat analyst failed: {exc}")
 
 
-@app.get("/api/intel/correlations", tags=["claude-team"])
-async def get_intel_correlations():
-    """CorrelationAgent output only — cross-feed pattern matches."""
+@app.get("/api/intel/correlations", tags=["intel"])
+async def get_intel_correlations(engine: Optional[str] = None):
+    """CorrelationAgent / CorrelationSynth output only — cross-feed patterns."""
+    team, _ = _resolve_team(engine)
     try:
         raw = await _gather_intel_payload()
-        return await _claude_team.correlation_agent.analyse(raw)
+        # Both engines expose .correlation_agent (Claude) or .correlation_synth (local).
+        # Use whichever the team has.
+        attr = "correlation_agent" if hasattr(team, "correlation_agent") else "correlation_synth"
+        return await _run_one_analyst(team, attr, raw)
     except Exception as exc:
         logger.error("Correlation agent failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Correlation agent failed: {exc}")
 
 
-@app.get("/api/intel/regional/{country_code}", tags=["claude-team"])
-async def get_intel_regional(country_code: str):
-    """
-    RegionalAnalyst output for a single country. Supported codes:
-    US, RU, CN, IN, IR.
-    """
+@app.get("/api/intel/regional/{country_code}", tags=["intel"])
+async def get_intel_regional(country_code: str, engine: Optional[str] = None):
+    """Regional brief for a single country (US, RU, CN, IN, IR)."""
     cc = country_code.upper()
     if cc not in COUNTRY_PROFILES:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported country code: {country_code}. Use one of: {', '.join(COUNTRY_PROFILES)}",
         )
-    analyst = _claude_team.regional_analysts.get(cc)
+    team, _ = _resolve_team(engine)
+    analyst = team.regional_analysts.get(cc)
     if analyst is None:
         raise HTTPException(status_code=500, detail=f"No analyst configured for {cc}")
     try:
         raw = await _gather_intel_payload()
-        return await analyst.analyse(raw)
+        if hasattr(analyst, "analyse"):
+            return await analyst.analyse(raw)
+        return analyst.synthesise(raw)
     except Exception as exc:
         logger.error("Regional analyst %s failed: %s", cc, exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Regional analyst failed: {exc}")
