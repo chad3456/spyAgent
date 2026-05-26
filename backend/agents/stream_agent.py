@@ -5,6 +5,8 @@ Sources:
   1. YouTube embed search URLs (no API key required — embed search iframes)
   2. GDELT image gallery API (free, no key required)
 """
+from __future__ import annotations
+
 
 import logging
 from datetime import datetime, timezone

@@ -9,6 +9,8 @@ This agent surfaces what IS public:
 
 Returns: {bases, sightings, news, summary}
 """
+from __future__ import annotations
+
 
 import logging
 from datetime import datetime, timezone

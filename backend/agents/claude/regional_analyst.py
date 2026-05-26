@@ -5,6 +5,8 @@ One instance is parameterised by country; `analyse(raw_data)` returns a brief
 focused on signals relevant to that country (own military movements, threats
 against it, internal stability, infra).
 """
+from __future__ import annotations
+
 
 import json
 

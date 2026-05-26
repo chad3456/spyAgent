@@ -8,6 +8,8 @@ Source priority:
 Returns country-level attack data:
   {country, countryCode, lat, lon, attackCount, severity, bandwidth}
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

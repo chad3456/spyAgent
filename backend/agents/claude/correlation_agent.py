@@ -5,6 +5,8 @@ E.g. "drone activity in region X coincides with internet outage in country Y"
 or "military aircraft surge over Bab-el-Mandeb coincides with reported Houthi
 salvo events".
 """
+from __future__ import annotations
+
 
 import json
 

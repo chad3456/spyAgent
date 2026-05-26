@@ -6,6 +6,8 @@ Base agent providing common utilities for all domain agents:
 - World Bank API response parser
 - Shared TTL cache
 """
+from __future__ import annotations
+
 
 import sys
 import re

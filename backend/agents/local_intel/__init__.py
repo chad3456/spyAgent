@@ -14,6 +14,8 @@ Components:
   - BriefingSynth    → executive summary assembled from the above
   - LocalTeamCoordinator orchestrates them
 """
+from __future__ import annotations
+
 
 from .base_synth import BaseSynth, country_bbox, haversine_km
 from .threat_synth import ThreatSynth

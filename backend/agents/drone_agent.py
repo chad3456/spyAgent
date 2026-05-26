@@ -8,6 +8,8 @@ Sources:
 
 Returns drone-related events with geolocation where extractable.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

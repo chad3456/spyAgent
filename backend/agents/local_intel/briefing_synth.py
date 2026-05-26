@@ -2,6 +2,8 @@
 BriefingSynth — executive summary built from ThreatSynth + CorrelationSynth +
 RegionalSynth output. Optional Ollama polish on the bottom-line prose.
 """
+from __future__ import annotations
+
 
 import asyncio
 

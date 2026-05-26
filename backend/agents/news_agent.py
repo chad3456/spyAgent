@@ -4,6 +4,8 @@ NewsAgent - Shared utility for fetching, deduplicating, and filtering news.
 Used by other agents AND exposed via the /api/summary endpoint to aggregate
 top headlines across all topics.
 """
+from __future__ import annotations
+
 
 import os
 import logging

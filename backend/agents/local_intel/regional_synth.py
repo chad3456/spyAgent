@@ -2,6 +2,8 @@
 RegionalSynth — per-country brief built from feed filtering. Same shape as
 RegionalAnalyst (Claude).
 """
+from __future__ import annotations
+
 
 from .base_synth import BaseSynth, in_country, severity_score
 

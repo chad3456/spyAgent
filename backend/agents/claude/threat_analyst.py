@@ -6,6 +6,8 @@ Input:  the aggregated swarm payload (flights, military aircraft, salvo events,
 Output: a ranked threats list with severity, region, summary, and supporting
         signal references.
 """
+from __future__ import annotations
+
 
 from .base_analyst import BaseAnalyst, DEFAULT_ANALYST_MODEL
 

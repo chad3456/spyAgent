@@ -4,6 +4,8 @@ OSINT Intelligence Platform - Multi-Agent System
 Each agent is responsible for fetching and processing data
 from a specific domain using real external APIs.
 """
+from __future__ import annotations
+
 
 from .economic_agent import EconomicAgent
 from .ai_infra_agent import AIInfraAgent

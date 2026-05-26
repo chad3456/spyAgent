@@ -10,6 +10,8 @@ Flow:
 
 The whole thing is cached for 5 minutes per unique data signature.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

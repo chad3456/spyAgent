@@ -22,6 +22,8 @@ Run locally:
 
 Deploy to Render.com — see /render.yaml in repo root.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

@@ -4,6 +4,8 @@ LocalTeamCoordinator — orchestrates the local intel team.
 Same interface as `agents.claude.TeamCoordinator.run(raw)` so the dashboard
 endpoint can swap between them transparently.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

@@ -6,6 +6,8 @@ the operators publish these feeds for exactly this kind of consumption.
 Returns a deduped, time-sorted item list across all feeds plus per-source
 counts.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

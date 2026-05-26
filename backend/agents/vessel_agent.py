@@ -10,6 +10,8 @@ Source priority:
 Returns normalised vessel records:
   {mmsi, name, type, lat, lon, speed, heading, destination, flag, shipType}
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

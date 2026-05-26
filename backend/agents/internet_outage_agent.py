@@ -8,6 +8,8 @@ Sources:
 
 Returns recent outage events with geolocation where available.
 """
+from __future__ import annotations
+
 
 import os
 import logging

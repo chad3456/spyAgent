@@ -12,6 +12,8 @@ human-grade intelligence products on top:
 
 A TeamCoordinator runs the analysts in parallel and bundles their output.
 """
+from __future__ import annotations
+
 
 from .base_analyst import BaseAnalyst, claude_available
 from .threat_analyst import ThreatAnalyst

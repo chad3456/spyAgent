@@ -3,6 +3,8 @@ ProtestAgent — fetches global protest/demonstration data from:
   - GDELT Document API V2 (free, no key required)
   - ACLED API (optional, requires ACLED_API_KEY + ACLED_EMAIL env vars)
 """
+from __future__ import annotations
+
 
 import asyncio
 import hashlib

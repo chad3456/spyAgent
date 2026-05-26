@@ -8,6 +8,8 @@ Wraps `anthropic.AsyncAnthropic` with:
   - Prompt caching on the (large, frozen) system prompt
   - Adaptive thinking for Opus models
 """
+from __future__ import annotations
+
 
 import json
 import logging

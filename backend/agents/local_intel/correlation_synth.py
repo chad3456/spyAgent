@@ -2,6 +2,8 @@
 CorrelationSynth — finds cross-feed patterns via geo proximity + simple
 content overlap. Output shape matches CorrelationAgent (Claude).
 """
+from __future__ import annotations
+
 
 import hashlib
 

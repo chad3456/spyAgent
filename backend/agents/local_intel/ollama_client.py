@@ -8,6 +8,8 @@ is on the default port. Override via:
   - OLLAMA_HOST  (default http://localhost:11434)
   - OLLAMA_MODEL (default llama3.2:3b — pick whatever you've pulled)
 """
+from __future__ import annotations
+
 
 import os
 import time

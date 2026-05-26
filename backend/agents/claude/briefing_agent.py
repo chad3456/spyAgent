@@ -3,6 +3,8 @@ BriefingAgent — top-level executive summary written by Opus 4.7 with adaptive
 thinking. Takes the analyses produced by the other analysts (threats, regional
 briefs, correlations) and produces a single coherent dashboard-top briefing.
 """
+from __future__ import annotations
+
 
 import json
 

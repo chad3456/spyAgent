@@ -10,6 +10,8 @@ Sources:
 Returns:
   {datacenters, cloudRegions, internetExchanges, summary}
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

@@ -9,6 +9,8 @@ region, and Iranian proxies (Houthi, Hezbollah, Iraqi militias). Aggregates:
 
 Returns categorised salvo events with origin/target geolocation.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

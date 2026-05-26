@@ -11,6 +11,8 @@ Sources:
 
 Returns a feed list with embed URLs, geolocation, category, and operator.
 """
+from __future__ import annotations
+
 
 import logging
 from datetime import datetime, timezone

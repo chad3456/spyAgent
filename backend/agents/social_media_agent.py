@@ -11,6 +11,8 @@ Curated list of verified OSINT/geopolitics accounts to track.
 Returns:
   {feeds, summary}
 """
+from __future__ import annotations
+
 
 import asyncio
 import hashlib

@@ -7,6 +7,8 @@ Source: NASA FIRMS (Fire Information for Resource Management System).
 
 Returns up to MAX_FIRES active fire detections worldwide.
 """
+from __future__ import annotations
+
 
 import csv
 import io

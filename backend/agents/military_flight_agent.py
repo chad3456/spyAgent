@@ -8,6 +8,8 @@ Detection strategy (layered):
 
 API: https://openskynetwork.github.io/opensky-api/rest.html  (no auth needed)
 """
+from __future__ import annotations
+
 
 import logging
 from datetime import datetime, timezone

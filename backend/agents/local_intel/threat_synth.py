@@ -2,6 +2,8 @@
 ThreatSynth — extracts ranked threats from the raw swarm payload using
 deterministic rules. Output shape matches ThreatAnalyst (Claude).
 """
+from __future__ import annotations
+
 
 import hashlib
 
