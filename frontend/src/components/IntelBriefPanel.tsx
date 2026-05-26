@@ -1,7 +1,7 @@
 import React from 'react'
 import { X, Brain, Sparkles, AlertTriangle, GitMerge, Flag, Eye, Cpu, Server } from 'lucide-react'
 import clsx from 'clsx'
-import { useIntelStatus, useTeamBrief } from '../hooks/useIntel'
+import { useIntelStatus, useTeamBrief, useDataSources } from '../hooks/useIntel'
 import type {
   BriefingAnalysis,
   ThreatAnalysis,
@@ -45,6 +45,7 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode 
 export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose }) => {
   const status = useIntelStatus()
   const brief = useTeamBrief(open)
+  const sources = useDataSources()
 
   if (!open) return null
 
@@ -255,6 +256,65 @@ export const IntelBriefPanel: React.FC<IntelBriefPanelProps> = ({ open, onClose 
                 </section>
               )}
             </>
+          )}
+
+          {/* Data sources transparency — confirms no-key OSINT mode */}
+          {sources.data && (
+            <details className="bg-emerald-500/5 border border-emerald-500/20 rounded-md p-3">
+              <summary className="text-[11px] uppercase tracking-wider text-emerald-300 cursor-pointer hover:text-emerald-200 flex items-center gap-2">
+                <Cpu className="w-3.5 h-3.5" />
+                Data sources ({sources.data.summary.keylessSources} keyless ·{' '}
+                {sources.data.summary.activeUpgrades}/{sources.data.summary.optionalUpgrades} upgrades active)
+              </summary>
+              <div className="mt-3">
+                <p className="text-[11px] text-emerald-200/90 mb-3 leading-relaxed">
+                  {sources.data.headline}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {sources.data.sources.map((s) => (
+                    <div
+                      key={s.label}
+                      className="bg-[#0a0f1e]/60 border border-[#1e3a5f] rounded px-2 py-1.5 flex items-start gap-2"
+                    >
+                      <span
+                        className={clsx(
+                          'w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0',
+                          s.mode === 'upgraded'
+                            ? 'bg-violet-400'
+                            : s.mode === 'keyless-public'
+                              ? 'bg-emerald-400'
+                              : 'bg-cyan-400',
+                        )}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] text-[#e8f0fe] truncate">{s.label}</div>
+                        <div className="text-[9px] text-[#8ba3c0] truncate">
+                          {s.mode === 'upgraded' && s.envKey
+                            ? `upgraded (${s.envKey} set)`
+                            : s.mode === 'keyless-public'
+                              ? 'public · no key needed'
+                              : `keyless · ${s.fallback}`}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-3 text-[9px] text-[#8ba3c0] flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    public, no key
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    keyless with fallback
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                    upgraded (key set)
+                  </span>
+                </div>
+              </div>
+            </details>
           )}
 
           {/* Drill-down: per-analyst raw output */}

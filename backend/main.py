@@ -57,6 +57,8 @@ from agents import (
     SatelliteAgent, HealthAgent, DatacenterAgent, SocialMediaAgent, NewsIntelAgent,
     # Dhurandhar extended agents
     FiresAgent, InternetOutageAgent, SubmarineAgent, DroneAgent, CCTVAgent, SalvoAgent,
+    # Pure-RSS OSINT think-tank / investigator / defence-blog aggregator
+    OSINTBlogAgent,
 )
 
 # Claude analyst team — synthesises the raw swarm output into intelligence products.
@@ -136,6 +138,7 @@ _submarine_agent = SubmarineAgent(timeout=_timeout)
 _drone_agent = DroneAgent(timeout=_timeout)
 _cctv_agent = CCTVAgent(timeout=_timeout)
 _salvo_agent = SalvoAgent(timeout=_timeout)
+_osint_blog_agent = OSINTBlogAgent(timeout=_timeout)
 
 # Claude analyst team — built once, reused across requests.
 _claude_team = TeamCoordinator()
@@ -661,6 +664,172 @@ async def get_osint_summary():
     except Exception as exc:
         logger.error("OSINT summary error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT summary: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Data-source transparency — show which feeds are running keyless vs keyed
+# ---------------------------------------------------------------------------
+
+# Each entry: (label, public, env_key, fallback_description)
+#   public      = True if it works with zero credentials by default
+#   env_key     = optional env var to upgrade quality (None if no upgrade exists)
+#   fallback    = what runs when the env var is unset
+_SOURCE_CATALOG: list[tuple[str, bool, Optional[str], str]] = [
+    # ── Aircraft ──────────────────────────────────────────────────────────
+    ("OpenSky Network (live aircraft)",          True,  None,                "anonymous public API, rate-limited"),
+    ("ADS-B.lol + airplanes.live (fallbacks)",   True,  None,                "anonymous community ADS-B aggregators"),
+    ("ADS-B military callsign filter",           True,  None,                "derived from the same public ADS-B feeds"),
+
+    # ── Maritime ──────────────────────────────────────────────────────────
+    ("Datalastic AIS (vessel positions)",        True,  "DATALASTIC_API_KEY","public demo key + GDELT maritime news fallback"),
+
+    # ── Earth & space ─────────────────────────────────────────────────────
+    ("USGS Earthquake Hazards (USGS NEIC)",      True,  None,                "fully open earthquake catalogue"),
+    ("Celestrak TLE bulk files",                 True,  None,                "open satellite element sets — no key required"),
+    ("N2YO satellite TLE",                       True,  "N2YO_API_KEY",      "Celestrak bulk TLE (still accurate via SGP4)"),
+    ("NASA FIRMS (24h global active fires)",     True,  None,                "open VIIRS/MODIS CSV, no auth"),
+
+    # ── Cyber / connectivity ──────────────────────────────────────────────
+    ("Cloudflare Radar DDoS",                    True,  "CF_RADAR_TOKEN",    "GDELT cyber-attack news fallback"),
+    ("Cloudflare Radar outages",                 True,  "CF_RADAR_TOKEN",    "NetBlocks RSS + GDELT outage news"),
+    ("NetBlocks RSS",                            True,  None,                "fully open civil-society outage feed"),
+
+    # ── Conflict & protests ───────────────────────────────────────────────
+    ("GDELT Document API v2",                    True,  None,                "completely open global news API"),
+    ("OCHA HAPI conflict events",                True,  None,                "open UN humanitarian API"),
+    ("ACLED API (geolocated unrest)",            True,  "ACLED_API_KEY",     "GDELT country-level events fallback"),
+
+    # ── Health ────────────────────────────────────────────────────────────
+    ("WHO Disease Outbreak News RSS",            True,  None,                "open RSS, no auth"),
+    ("ReliefWeb humanitarian updates",           True,  None,                "open RSS"),
+    ("World Bank vaccination data",              True,  None,                "open development indicators"),
+
+    # ── Infrastructure ────────────────────────────────────────────────────
+    ("PeeringDB datacenters & IXPs",             True,  None,                "open registry"),
+    ("Static cloud-region catalogue",            True,  None,                "publicly documented AWS/GCP/Azure regions"),
+
+    # ── News & social ─────────────────────────────────────────────────────
+    ("NewsAPI",                                  True,  "NEWS_API_KEY",      "GDELT + multi-source RSS fallback"),
+    ("Twitter/X verified OSINT accounts",        True,  "TWITTER_BEARER_TOKEN", "RSS-bridged OSINT feeds + GDELT"),
+    ("OSINT think-tank & investigator RSS",      True,  None,                "ISW / CSIS / RUSI / Bellingcat / NATO / UN / etc."),
+
+    # ── Dhurandhar extended ───────────────────────────────────────────────
+    ("Submarine bases (curated OSINT)",          True,  None,                "publicly documented base locations"),
+    ("Drone hotspots & War Zone / Defense News", True,  None,                "open RSS + GDELT"),
+    ("Public CCTV webcam catalogue",             True,  None,                "operator-published feeds only (EarthCam etc.)"),
+    ("Iran/US salvo tracker",                    True,  None,                "GDELT + USNI + LWJ + curated anchors"),
+
+    # ── Synthesis layer ───────────────────────────────────────────────────
+    ("Local heuristic intel team (no key)",      True,  None,                "rule-based threat/correlation/regional/briefing synth"),
+    ("Ollama local LLM polish (optional)",       True,  "OLLAMA_HOST",       "deterministic prose if Ollama is not running"),
+    ("Claude analyst team (optional upgrade)",   True,  "ANTHROPIC_API_KEY", "local heuristic team takes over with identical shape"),
+]
+
+
+@app.get("/api/sources", tags=["meta"])
+async def get_sources():
+    """
+    Explicit inventory of every data source the platform uses, what mode
+    each is running in (keyless public vs upgraded with key), and what the
+    fallback is when an optional key isn't set.
+
+    The dashboard is designed to run with ZERO API keys. Every key listed
+    here is an optional upgrade with a working public fallback.
+    """
+    sources = []
+    keyless_count = 0
+    upgrade_available = 0
+    upgrade_active = 0
+    for label, public, env_key, fallback in _SOURCE_CATALOG:
+        key_set = bool(os.environ.get(env_key, "").strip()) if env_key else False
+        mode = (
+            "keyless-public"
+            if not env_key
+            else ("upgraded" if key_set else "keyless-fallback")
+        )
+        if not env_key:
+            keyless_count += 1
+        else:
+            upgrade_available += 1
+            if key_set:
+                upgrade_active += 1
+        sources.append({
+            "label": label,
+            "publiclyAvailable": public,
+            "envKey": env_key,
+            "envKeySet": key_set,
+            "mode": mode,
+            "fallback": fallback,
+        })
+
+    return {
+        "headline": (
+            f"OSINT platform running on public data. {keyless_count} sources "
+            f"need no key; {upgrade_available} optional upgrades available "
+            f"({upgrade_active} currently active)."
+        ),
+        "noKeyRequired": True,
+        "sources": sources,
+        "summary": {
+            "totalSources": len(sources),
+            "keylessSources": keyless_count,
+            "optionalUpgrades": upgrade_available,
+            "activeUpgrades": upgrade_active,
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/osint-blogs", tags=["dhurandhar"])
+async def get_osint_blogs():
+    """
+    Aggregated OSINT / think-tank / defence-blog RSS items.
+
+    Sources include ISW, CSIS, RUSI, Bellingcat, Long War Journal, USNI,
+    Naval News, Defense News, The War Zone, NATO, UN, ReliefWeb, CISA,
+    Krebs on Security. All public RSS, zero auth required.
+    """
+    try:
+        return await _osint_blog_agent.fetch_data()
+    except Exception as exc:
+        logger.error("OSINT blog agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT blog feeds: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Startup banner — make the no-key story visible in the operator's terminal.
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _log_startup_banner():
+    keyless = sum(1 for _, _, env_key, _ in _SOURCE_CATALOG if not env_key)
+    upgrades_total = sum(1 for _, _, env_key, _ in _SOURCE_CATALOG if env_key)
+    upgrades_set = sum(
+        1
+        for _, _, env_key, _ in _SOURCE_CATALOG
+        if env_key and os.environ.get(env_key, "").strip()
+    )
+    logger.info("=" * 70)
+    logger.info("OSINT Intelligence Platform — no-key mode")
+    logger.info("  %d sources running on public data with zero credentials", keyless)
+    logger.info(
+        "  %d optional upgrades available (%d currently active)",
+        upgrades_total, upgrades_set,
+    )
+    if upgrades_set == 0:
+        logger.info("  All upgrades unset → every feed using its public fallback.")
+    else:
+        active = [
+            env_key
+            for _, _, env_key, _ in _SOURCE_CATALOG
+            if env_key and os.environ.get(env_key, "").strip()
+        ]
+        logger.info("  Active upgrades: %s", ", ".join(active))
+    logger.info("  Intel synthesis: %s",
+                "Claude team" if os.environ.get("ANTHROPIC_API_KEY", "").strip()
+                else "Local heuristic team (rule-based, no key needed)")
+    logger.info("  Endpoint inventory: GET /api/sources")
+    logger.info("=" * 70)
 
 
 # ---------------------------------------------------------------------------

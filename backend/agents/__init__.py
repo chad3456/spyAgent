@@ -33,6 +33,7 @@ from .submarine_agent import SubmarineAgent
 from .drone_agent import DroneAgent
 from .cctv_agent import CCTVAgent
 from .salvo_agent import SalvoAgent
+from .osint_blog_agent import OSINTBlogAgent
 
 __all__ = [
     # Existing agents
@@ -62,4 +63,5 @@ __all__ = [
     "DroneAgent",
     "CCTVAgent",
     "SalvoAgent",
+    "OSINTBlogAgent",
 ]
