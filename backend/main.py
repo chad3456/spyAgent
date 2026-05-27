@@ -162,6 +162,30 @@ def _active_team():
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.get("/", tags=["meta"])
+async def root():
+    """
+    Backend landing page. The dashboard UI lives on the frontend (Vite on
+    :3000 in dev). Hit /docs for the interactive Swagger UI.
+    """
+    return {
+        "service": "OSINT Intelligence Platform API",
+        "status": "ok",
+        "note": "This is the backend API. Open the dashboard at http://localhost:3000",
+        "links": {
+            "dashboard": "http://localhost:3000",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "health": "/health",
+            "sources_inventory": "/api/sources",
+            "intel_team_brief": "/api/intel/team-brief",
+            "intel_status": "/api/intel/status",
+        },
+        "noKeyMode": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/health", tags=["meta"])
 async def health_check():
     """
