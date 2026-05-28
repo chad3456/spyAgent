@@ -17,6 +17,8 @@ Required env var (free registration at https://www.n2yo.com/api/):
 
 Without the key the agent falls back to Celestrak bulk TLE feeds.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

@@ -7,6 +7,8 @@ Data sources:
   - RSS: Economic Times (main + markets), PIB India
   - Optional: NewsAPI, GNews (via NewsAgent)
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

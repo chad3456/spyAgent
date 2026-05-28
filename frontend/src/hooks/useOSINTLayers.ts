@@ -10,6 +10,12 @@ import {
   fetchDatacenters,
   fetchSocialFeeds,
   fetchNewsIntel,
+  fetchFires,
+  fetchInternetOutages,
+  fetchSubmarines,
+  fetchDrones,
+  fetchCCTV,
+  fetchSalvo,
 } from '../api/osint'
 import type {
   FlightsResponse,
@@ -22,6 +28,12 @@ import type {
   DatacentersResponse,
   SocialFeedsResponse,
   NewsIntelResponse,
+  FiresResponse,
+  InternetOutagesResponse,
+  SubmarinesResponse,
+  DronesResponse,
+  CCTVResponse,
+  SalvoResponse,
   LayerKey,
 } from '../types/osint'
 
@@ -102,4 +114,35 @@ export function useSocialFeeds(_enabled: boolean) {
 
 export function useNewsIntel(enabled: boolean) {
   return layerQuery<NewsIntelResponse>('news_intel', fetchNewsIntel, enabled, 300_000)
+}
+
+// ─── Dhurandhar extended layer hooks ──────────────────────────────────────────
+
+export function useFires(enabled: boolean) {
+  return layerQuery<FiresResponse>('fires', fetchFires, enabled, 1_800_000)
+}
+
+export function useInternetOutages(enabled: boolean) {
+  return layerQuery<InternetOutagesResponse>(
+    'internet_outages',
+    fetchInternetOutages,
+    enabled,
+    600_000,
+  )
+}
+
+export function useSubmarines(enabled: boolean) {
+  return layerQuery<SubmarinesResponse>('submarines', fetchSubmarines, enabled, 86_400_000)
+}
+
+export function useDrones(enabled: boolean) {
+  return layerQuery<DronesResponse>('drones', fetchDrones, enabled, 600_000)
+}
+
+export function useCCTV(enabled: boolean) {
+  return layerQuery<CCTVResponse>('cctv', fetchCCTV, enabled, 86_400_000)
+}
+
+export function useSalvo(enabled: boolean) {
+  return layerQuery<SalvoResponse>('salvo', fetchSalvo, enabled, 600_000)
 }

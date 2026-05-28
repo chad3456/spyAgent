@@ -9,6 +9,8 @@ Source priority (all free, no auth):
 Returns up to 500 airborne aircraft with valid lat/lon.
 Cache TTL: 30 seconds (matches live data refresh rate).
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

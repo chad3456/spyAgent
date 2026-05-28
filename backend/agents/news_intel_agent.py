@@ -11,6 +11,8 @@ Topics tracked: geopolitics, defense, war, military, cyberattack, sanctions, NAT
 Returns:
   {articles, categories, summary}
 """
+from __future__ import annotations
+
 
 import asyncio
 import hashlib

@@ -8,6 +8,8 @@ Fetches three feeds concurrently:
 
 GeoJSON spec: https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

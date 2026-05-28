@@ -22,12 +22,15 @@ Run locally:
 
 Deploy to Render.com — see /render.yaml in repo root.
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging
 import os
 import sys
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +57,23 @@ from agents import (
     ProtestAgent, HAPIAgent, StreamAgent,
     FlightAgent, MilitaryFlightAgent, VesselAgent, EarthquakeAgent, DDoSAgent,
     SatelliteAgent, HealthAgent, DatacenterAgent, SocialMediaAgent, NewsIntelAgent,
+    # Dhurandhar extended agents
+    FiresAgent, InternetOutageAgent, SubmarineAgent, DroneAgent, CCTVAgent, SalvoAgent,
+    # Pure-RSS OSINT think-tank / investigator / defence-blog aggregator
+    OSINTBlogAgent,
 )
+
+# Claude analyst team — synthesises the raw swarm output into intelligence products.
+from agents.claude import (
+    TeamCoordinator, ThreatAnalyst, CorrelationAgent, BriefingAgent,
+    RegionalAnalyst, claude_available,
+)
+from agents.claude.regional_analyst import COUNTRY_PROFILES
+
+# Local intel team — rule-based heuristics + optional Ollama polish. Works
+# fully offline with no API key, producing the same response shape as the
+# Claude team so the dashboard panel is engine-agnostic.
+from agents.local_intel import LocalTeamCoordinator, ollama_available
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -114,10 +133,58 @@ _datacenter_agent = DatacenterAgent(timeout=_timeout)
 _social_media_agent = SocialMediaAgent(timeout=_timeout)
 _news_intel_agent = NewsIntelAgent(timeout=_timeout)
 
+# Dhurandhar extended agents
+_fires_agent = FiresAgent(timeout=_timeout)
+_internet_outage_agent = InternetOutageAgent(timeout=_timeout)
+_submarine_agent = SubmarineAgent(timeout=_timeout)
+_drone_agent = DroneAgent(timeout=_timeout)
+_cctv_agent = CCTVAgent(timeout=_timeout)
+_salvo_agent = SalvoAgent(timeout=_timeout)
+_osint_blog_agent = OSINTBlogAgent(timeout=_timeout)
+
+# Claude analyst team — built once, reused across requests.
+_claude_team = TeamCoordinator()
+
+# Local heuristic intel team — always available, no API key required.
+_local_team = LocalTeamCoordinator()
+
+
+def _active_team():
+    """
+    Pick the analyst team to use. Claude if its key is set; otherwise the
+    local heuristic team. Override with ?engine=local or ?engine=claude on
+    individual routes.
+    """
+    return _claude_team if claude_available() else _local_team
+
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/", tags=["meta"])
+async def root():
+    """
+    Backend landing page. The dashboard UI lives on the frontend (Vite on
+    :3000 in dev). Hit /docs for the interactive Swagger UI.
+    """
+    return {
+        "service": "OSINT Intelligence Platform API",
+        "status": "ok",
+        "note": "This is the backend API. Open the dashboard at http://localhost:3000",
+        "links": {
+            "dashboard": "http://localhost:3000",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "health": "/health",
+            "sources_inventory": "/api/sources",
+            "intel_team_brief": "/api/intel/team-brief",
+            "intel_status": "/api/intel/status",
+        },
+        "noKeyMode": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
 
 @app.get("/health", tags=["meta"])
 async def health_check():
@@ -623,6 +690,464 @@ async def get_osint_summary():
     except Exception as exc:
         logger.error("OSINT summary error: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT summary: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Data-source transparency — show which feeds are running keyless vs keyed
+# ---------------------------------------------------------------------------
+
+# Each entry: (label, public, env_key, fallback_description)
+#   public      = True if it works with zero credentials by default
+#   env_key     = optional env var to upgrade quality (None if no upgrade exists)
+#   fallback    = what runs when the env var is unset
+_SOURCE_CATALOG: list[tuple[str, bool, Optional[str], str]] = [
+    # ── Aircraft ──────────────────────────────────────────────────────────
+    ("OpenSky Network (live aircraft)",          True,  None,                "anonymous public API, rate-limited"),
+    ("ADS-B.lol + airplanes.live (fallbacks)",   True,  None,                "anonymous community ADS-B aggregators"),
+    ("ADS-B military callsign filter",           True,  None,                "derived from the same public ADS-B feeds"),
+
+    # ── Maritime ──────────────────────────────────────────────────────────
+    ("Datalastic AIS (vessel positions)",        True,  "DATALASTIC_API_KEY","public demo key + GDELT maritime news fallback"),
+
+    # ── Earth & space ─────────────────────────────────────────────────────
+    ("USGS Earthquake Hazards (USGS NEIC)",      True,  None,                "fully open earthquake catalogue"),
+    ("Celestrak TLE bulk files",                 True,  None,                "open satellite element sets — no key required"),
+    ("N2YO satellite TLE",                       True,  "N2YO_API_KEY",      "Celestrak bulk TLE (still accurate via SGP4)"),
+    ("NASA FIRMS (24h global active fires)",     True,  None,                "open VIIRS/MODIS CSV, no auth"),
+
+    # ── Cyber / connectivity ──────────────────────────────────────────────
+    ("Cloudflare Radar DDoS",                    True,  "CF_RADAR_TOKEN",    "GDELT cyber-attack news fallback"),
+    ("Cloudflare Radar outages",                 True,  "CF_RADAR_TOKEN",    "NetBlocks RSS + GDELT outage news"),
+    ("NetBlocks RSS",                            True,  None,                "fully open civil-society outage feed"),
+
+    # ── Conflict & protests ───────────────────────────────────────────────
+    ("GDELT Document API v2",                    True,  None,                "completely open global news API"),
+    ("OCHA HAPI conflict events",                True,  None,                "open UN humanitarian API"),
+    ("ACLED API (geolocated unrest)",            True,  "ACLED_API_KEY",     "GDELT country-level events fallback"),
+
+    # ── Health ────────────────────────────────────────────────────────────
+    ("WHO Disease Outbreak News RSS",            True,  None,                "open RSS, no auth"),
+    ("ReliefWeb humanitarian updates",           True,  None,                "open RSS"),
+    ("World Bank vaccination data",              True,  None,                "open development indicators"),
+
+    # ── Infrastructure ────────────────────────────────────────────────────
+    ("PeeringDB datacenters & IXPs",             True,  None,                "open registry"),
+    ("Static cloud-region catalogue",            True,  None,                "publicly documented AWS/GCP/Azure regions"),
+
+    # ── News & social ─────────────────────────────────────────────────────
+    ("NewsAPI",                                  True,  "NEWS_API_KEY",      "GDELT + multi-source RSS fallback"),
+    ("Twitter/X verified OSINT accounts",        True,  "TWITTER_BEARER_TOKEN", "RSS-bridged OSINT feeds + GDELT"),
+    ("OSINT think-tank & investigator RSS",      True,  None,                "ISW / CSIS / RUSI / Bellingcat / NATO / UN / etc."),
+
+    # ── Dhurandhar extended ───────────────────────────────────────────────
+    ("Submarine bases (curated OSINT)",          True,  None,                "publicly documented base locations"),
+    ("Drone hotspots & War Zone / Defense News", True,  None,                "open RSS + GDELT"),
+    ("Public CCTV webcam catalogue",             True,  None,                "operator-published feeds only (EarthCam etc.)"),
+    ("Iran/US salvo tracker",                    True,  None,                "GDELT + USNI + LWJ + curated anchors"),
+
+    # ── Synthesis layer ───────────────────────────────────────────────────
+    ("Local heuristic intel team (no key)",      True,  None,                "rule-based threat/correlation/regional/briefing synth"),
+    ("Ollama local LLM polish (optional)",       True,  "OLLAMA_HOST",       "deterministic prose if Ollama is not running"),
+    ("Claude analyst team (optional upgrade)",   True,  "ANTHROPIC_API_KEY", "local heuristic team takes over with identical shape"),
+]
+
+
+@app.get("/api/sources", tags=["meta"])
+async def get_sources():
+    """
+    Explicit inventory of every data source the platform uses, what mode
+    each is running in (keyless public vs upgraded with key), and what the
+    fallback is when an optional key isn't set.
+
+    The dashboard is designed to run with ZERO API keys. Every key listed
+    here is an optional upgrade with a working public fallback.
+    """
+    sources = []
+    keyless_count = 0
+    upgrade_available = 0
+    upgrade_active = 0
+    for label, public, env_key, fallback in _SOURCE_CATALOG:
+        key_set = bool(os.environ.get(env_key, "").strip()) if env_key else False
+        mode = (
+            "keyless-public"
+            if not env_key
+            else ("upgraded" if key_set else "keyless-fallback")
+        )
+        if not env_key:
+            keyless_count += 1
+        else:
+            upgrade_available += 1
+            if key_set:
+                upgrade_active += 1
+        sources.append({
+            "label": label,
+            "publiclyAvailable": public,
+            "envKey": env_key,
+            "envKeySet": key_set,
+            "mode": mode,
+            "fallback": fallback,
+        })
+
+    return {
+        "headline": (
+            f"OSINT platform running on public data. {keyless_count} sources "
+            f"need no key; {upgrade_available} optional upgrades available "
+            f"({upgrade_active} currently active)."
+        ),
+        "noKeyRequired": True,
+        "sources": sources,
+        "summary": {
+            "totalSources": len(sources),
+            "keylessSources": keyless_count,
+            "optionalUpgrades": upgrade_available,
+            "activeUpgrades": upgrade_active,
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/osint-blogs", tags=["dhurandhar"])
+async def get_osint_blogs():
+    """
+    Aggregated OSINT / think-tank / defence-blog RSS items.
+
+    Sources include ISW, CSIS, RUSI, Bellingcat, Long War Journal, USNI,
+    Naval News, Defense News, The War Zone, NATO, UN, ReliefWeb, CISA,
+    Krebs on Security. All public RSS, zero auth required.
+    """
+    try:
+        return await _osint_blog_agent.fetch_data()
+    except Exception as exc:
+        logger.error("OSINT blog agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch OSINT blog feeds: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Startup banner — make the no-key story visible in the operator's terminal.
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _log_startup_banner():
+    keyless = sum(1 for _, _, env_key, _ in _SOURCE_CATALOG if not env_key)
+    upgrades_total = sum(1 for _, _, env_key, _ in _SOURCE_CATALOG if env_key)
+    upgrades_set = sum(
+        1
+        for _, _, env_key, _ in _SOURCE_CATALOG
+        if env_key and os.environ.get(env_key, "").strip()
+    )
+    logger.info("=" * 70)
+    logger.info("OSINT Intelligence Platform — no-key mode")
+    logger.info("  %d sources running on public data with zero credentials", keyless)
+    logger.info(
+        "  %d optional upgrades available (%d currently active)",
+        upgrades_total, upgrades_set,
+    )
+    if upgrades_set == 0:
+        logger.info("  All upgrades unset → every feed using its public fallback.")
+    else:
+        active = [
+            env_key
+            for _, _, env_key, _ in _SOURCE_CATALOG
+            if env_key and os.environ.get(env_key, "").strip()
+        ]
+        logger.info("  Active upgrades: %s", ", ".join(active))
+    logger.info("  Intel synthesis: %s",
+                "Claude team" if os.environ.get("ANTHROPIC_API_KEY", "").strip()
+                else "Local heuristic team (rule-based, no key needed)")
+    logger.info("  Endpoint inventory: GET /api/sources")
+    logger.info("=" * 70)
+
+
+# ---------------------------------------------------------------------------
+# Dhurandhar Extended Intelligence Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/api/fires", tags=["dhurandhar"])
+async def get_fires():
+    """
+    Global active wildfire detections from NASA FIRMS (VIIRS / MODIS, 24h).
+    Falls back to GDELT wildfire news if FIRMS endpoints are unreachable.
+    """
+    try:
+        return await _fires_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Fires agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch fires: {exc}")
+
+
+@app.get("/api/internet-outages", tags=["dhurandhar"])
+async def get_internet_outages():
+    """
+    Internet shutdown / outage reports.
+    Sources: Cloudflare Radar (CF_RADAR_TOKEN), NetBlocks RSS, GDELT.
+    """
+    try:
+        return await _internet_outage_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Internet outage agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch outages: {exc}")
+
+
+@app.get("/api/submarines", tags=["dhurandhar"])
+async def get_submarines():
+    """
+    Known submarine bases (US, Russia, China, India, NATO, Iran, etc.) plus
+    OSINT-derived deployment news. Real-time sub positions are classified
+    and not publicly broadcast.
+    """
+    try:
+        return await _submarine_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Submarine agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch submarine data: {exc}")
+
+
+@app.get("/api/drones", tags=["dhurandhar"])
+async def get_drones():
+    """
+    Drone strike & UAV incident tracking from GDELT + The War Zone + Defense News.
+    """
+    try:
+        return await _drone_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Drone agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch drone data: {exc}")
+
+
+@app.get("/api/cctv", tags=["dhurandhar"])
+async def get_cctv():
+    """
+    Curated catalogue of publicly published webcams (tourism, ports, airports,
+    traffic, conflict-adjacent). Only operator-released feeds are referenced.
+    """
+    try:
+        return await _cctv_agent.fetch_data()
+    except Exception as exc:
+        logger.error("CCTV agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch CCTV catalogue: {exc}")
+
+
+@app.get("/api/salvo", tags=["dhurandhar"])
+async def get_salvo():
+    """
+    Iran / US / proxy conflict salvo tracker — missile and drone exchanges
+    aggregated from GDELT, USNI, Naval News, The War Zone and Long War Journal.
+    Includes well-documented historical salvo anchors with origin/target arcs.
+    """
+    try:
+        return await _salvo_agent.fetch_data()
+    except Exception as exc:
+        logger.error("Salvo agent error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch salvo data: {exc}")
+
+
+@app.get("/api/dhurandhar-summary", tags=["dhurandhar"])
+async def get_dhurandhar_summary():
+    """
+    Combined Dhurandhar payload: all six extended intelligence layers fetched concurrently.
+    """
+    try:
+        fires, outages, subs, drones, cctv, salvo = await asyncio.gather(
+            _fires_agent.fetch_data(),
+            _internet_outage_agent.fetch_data(),
+            _submarine_agent.fetch_data(),
+            _drone_agent.fetch_data(),
+            _cctv_agent.fetch_data(),
+            _salvo_agent.fetch_data(),
+            return_exceptions=True,
+        )
+
+        def _safe(r, label):
+            if isinstance(r, Exception):
+                logger.error("%s failed: %s", label, r)
+                return {"error": str(r)}
+            return r
+
+        return {
+            "fires":          _safe(fires,   "FiresAgent"),
+            "internetOutages":_safe(outages, "InternetOutageAgent"),
+            "submarines":     _safe(subs,    "SubmarineAgent"),
+            "drones":         _safe(drones,  "DroneAgent"),
+            "cctv":           _safe(cctv,    "CCTVAgent"),
+            "salvo":          _safe(salvo,   "SalvoAgent"),
+            "lastUpdated":    datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.error("Dhurandhar summary error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch dhurandhar summary: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Claude Analyst Team Routes
+# ---------------------------------------------------------------------------
+
+async def _gather_intel_payload() -> dict:
+    """
+    Aggregate the OSINT swarm output into a single payload the Claude analyst
+    team can reason over. Runs the agents concurrently and tolerates per-agent
+    failures so a single broken feed doesn't blank the brief.
+    """
+    results = await asyncio.gather(
+        _flight_agent.fetch_data(),
+        _military_flight_agent.fetch_data(),
+        _vessel_agent.fetch_data(),
+        _earthquake_agent.fetch_data(),
+        _satellite_agent.fetch_data(),
+        _health_agent.fetch_data(),
+        _datacenter_agent.fetch_data(),
+        _fires_agent.fetch_data(),
+        _internet_outage_agent.fetch_data(),
+        _submarine_agent.fetch_data(),
+        _drone_agent.fetch_data(),
+        _cctv_agent.fetch_data(),
+        _salvo_agent.fetch_data(),
+        _protest_agent.fetch_data(),
+        _hapi_agent.fetch_data(),
+        _news_intel_agent.fetch_data(),
+        return_exceptions=True,
+    )
+    labels = [
+        "flights", "militaryFlights", "vessels", "earthquakes", "satellites",
+        "health", "datacenters", "fires", "internetOutages", "submarines",
+        "drones", "cctv", "salvo", "protests", "hapiEvents", "newsIntel",
+    ]
+
+    def _safe(r, label):
+        if isinstance(r, Exception):
+            logger.warning("intel payload — %s failed: %s", label, r)
+            return {"error": str(r)}
+        return r
+
+    return {label: _safe(r, label) for label, r in zip(labels, results)}
+
+
+def _resolve_team(engine: Optional[str] = None):
+    """Map ?engine= query param → coordinator. Defaults to whatever's available."""
+    if engine == "claude":
+        if not claude_available():
+            raise HTTPException(
+                status_code=400,
+                detail="engine=claude requested but ANTHROPIC_API_KEY is not set.",
+            )
+        return _claude_team, "claude"
+    if engine == "local":
+        return _local_team, "local"
+    if engine is None:
+        team = _active_team()
+        return team, "claude" if team is _claude_team else "local"
+    raise HTTPException(status_code=400, detail=f"unknown engine: {engine}")
+
+
+async def _run_one_analyst(team, attr: str, raw: dict):
+    """
+    Run a single analyst across either team. Claude analysts expose .analyse;
+    local synths expose .synthesise. We normalise here so the routes are
+    engine-agnostic.
+    """
+    analyst = getattr(team, attr)
+    if hasattr(analyst, "analyse"):
+        return await analyst.analyse(raw)
+    # Local synth — synchronous CPU work
+    return analyst.synthesise(raw)
+
+
+@app.get("/api/intel/status", tags=["intel"])
+async def get_intel_status():
+    """Which intel team is currently driving /api/intel/* routes?"""
+    using_claude = claude_available()
+    active = _active_team()
+    return {
+        "claudeAvailable": using_claude,
+        "ollamaAvailable": ollama_available(),
+        "activeEngine": "claude" if using_claude else "local",
+        "countries": list(active.regional_analysts.keys()),
+        "analysts": [
+            "threat_analyst", "correlation_agent", "briefing_agent",
+            *[f"regional_analyst:{cc}" for cc in active.regional_analysts],
+        ],
+        "briefingModel": active.briefing_agent.model if hasattr(active.briefing_agent, "model") else "local-heuristic-v1",
+        "analystModel": active.threat_analyst.model if hasattr(active.threat_analyst, "model") else "local-heuristic-v1",
+        "engines": {
+            "claude": {
+                "available": using_claude,
+                "reason": None if using_claude else "ANTHROPIC_API_KEY not set",
+            },
+            "local": {"available": True, "reason": None},
+            "ollama": {
+                "available": ollama_available(),
+                "reason": None if ollama_available() else "Ollama not detected on localhost:11434 (optional)",
+            },
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/intel/team-brief", tags=["intel"])
+async def get_team_brief(engine: Optional[str] = None):
+    """
+    Full analyst team product (briefing + threats + correlations + regional).
+    Defaults to Claude if ANTHROPIC_API_KEY is set, otherwise the local
+    heuristic team. Force one with ?engine=claude or ?engine=local.
+    """
+    team, engine_label = _resolve_team(engine)
+    try:
+        raw = await _gather_intel_payload()
+        result = await team.run(raw)
+        result.setdefault("engine", engine_label)
+        return result
+    except Exception as exc:
+        logger.error("Team brief failed (engine=%s): %s", engine_label, exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Team brief failed: {exc}")
+
+
+@app.get("/api/intel/threats", tags=["intel"])
+async def get_intel_threats(engine: Optional[str] = None):
+    """ThreatAnalyst / ThreatSynth output only — ranked threats list."""
+    team, _ = _resolve_team(engine)
+    try:
+        raw = await _gather_intel_payload()
+        return await _run_one_analyst(team, "threat_analyst", raw)
+    except Exception as exc:
+        logger.error("Threat analyst failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Threat analyst failed: {exc}")
+
+
+@app.get("/api/intel/correlations", tags=["intel"])
+async def get_intel_correlations(engine: Optional[str] = None):
+    """CorrelationAgent / CorrelationSynth output only — cross-feed patterns."""
+    team, _ = _resolve_team(engine)
+    try:
+        raw = await _gather_intel_payload()
+        # Both engines expose .correlation_agent (Claude) or .correlation_synth (local).
+        # Use whichever the team has.
+        attr = "correlation_agent" if hasattr(team, "correlation_agent") else "correlation_synth"
+        return await _run_one_analyst(team, attr, raw)
+    except Exception as exc:
+        logger.error("Correlation agent failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Correlation agent failed: {exc}")
+
+
+@app.get("/api/intel/regional/{country_code}", tags=["intel"])
+async def get_intel_regional(country_code: str, engine: Optional[str] = None):
+    """Regional brief for a single country (US, RU, CN, IN, IR)."""
+    cc = country_code.upper()
+    if cc not in COUNTRY_PROFILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported country code: {country_code}. Use one of: {', '.join(COUNTRY_PROFILES)}",
+        )
+    team, _ = _resolve_team(engine)
+    analyst = team.regional_analysts.get(cc)
+    if analyst is None:
+        raise HTTPException(status_code=500, detail=f"No analyst configured for {cc}")
+    try:
+        raw = await _gather_intel_payload()
+        if hasattr(analyst, "analyse"):
+            return await analyst.analyse(raw)
+        return analyst.synthesise(raw)
+    except Exception as exc:
+        logger.error("Regional analyst %s failed: %s", cc, exc, exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Regional analyst failed: {exc}")
 
 
 # ---------------------------------------------------------------------------

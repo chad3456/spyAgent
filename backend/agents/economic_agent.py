@@ -8,6 +8,8 @@ Data sources:
   - RSS: Economic Times, Business Standard
   - Optional: NewsAPI, GNews
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging

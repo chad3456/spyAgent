@@ -4,6 +4,8 @@ OSINT Intelligence Platform - Multi-Agent System
 Each agent is responsible for fetching and processing data
 from a specific domain using real external APIs.
 """
+from __future__ import annotations
+
 
 from .economic_agent import EconomicAgent
 from .ai_infra_agent import AIInfraAgent
@@ -26,6 +28,15 @@ from .datacenter_agent import DatacenterAgent
 from .social_media_agent import SocialMediaAgent
 from .news_intel_agent import NewsIntelAgent
 
+# Dhurandhar branch — extended intelligence agents
+from .fires_agent import FiresAgent
+from .internet_outage_agent import InternetOutageAgent
+from .submarine_agent import SubmarineAgent
+from .drone_agent import DroneAgent
+from .cctv_agent import CCTVAgent
+from .salvo_agent import SalvoAgent
+from .osint_blog_agent import OSINTBlogAgent
+
 __all__ = [
     # Existing agents
     "EconomicAgent",
@@ -47,4 +58,12 @@ __all__ = [
     "DatacenterAgent",
     "SocialMediaAgent",
     "NewsIntelAgent",
+    # Dhurandhar extended agents
+    "FiresAgent",
+    "InternetOutageAgent",
+    "SubmarineAgent",
+    "DroneAgent",
+    "CCTVAgent",
+    "SalvoAgent",
+    "OSINTBlogAgent",
 ]

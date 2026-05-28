@@ -12,5 +12,9 @@ geopy==2.4.1
 # Satellite position propagation (Celestrak TLE + SGP4)
 sgp4==2.23
 
+# Anthropic SDK — powers the Claude analyst team that synthesises raw OSINT
+# swarm output into threat assessments, regional briefs, and correlations.
+anthropic==0.69.0
+
 # Additional data processing
 pytz==2024.1

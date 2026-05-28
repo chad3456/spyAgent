@@ -4,6 +4,8 @@ Humanitarian API (HAPI): https://hapi.humdata.org/api/v1/
 
 No API key required. Uses app_identifier query param.
 """
+from __future__ import annotations
+
 
 import asyncio
 import hashlib

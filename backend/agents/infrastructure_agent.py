@@ -9,6 +9,8 @@ Data sources:
   - RSS: PIB India (official government press releases)
   - Optional: NewsAPI, GNews (via NewsAgent)
 """
+from __future__ import annotations
+
 
 import asyncio
 import logging
